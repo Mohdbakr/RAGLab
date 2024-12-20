@@ -1,9 +1,11 @@
 from typing import Optional, Any
+import requests
+import time
 
 import streamlit as st
 
 
-API_BASE_URL: str = ""
+API_BASE_URL: str = "http://localhost:8000/"
 
 
 def chat_with_backend(query: str) -> Optional[str]:
@@ -44,6 +46,49 @@ def check_health_status() -> Optional[str]:
         Optional[str]: The health status message, or an error message.
     """
     pass
+
+
+def check_server_status(url):
+    """Check if the backend server is running and returns the status."""
+    try:
+        response = requests.get(
+            url, timeout=5
+        )  # Set a timeout to avoid hanging
+        if response.status_code == 200:
+            return True, response.json().get("message", "Server is Up")
+    except requests.exceptions.ConnectionError:
+        st.error(
+            f"Error: Unable to connect to the backend at {url} (Connection Refused)"
+        )
+    except requests.exceptions.Timeout:
+        st.error(f"Error: Request to {url} timed out")
+    except requests.exceptions.RequestException as e:
+        st.error(f"Unexpected error: {e}")
+    return False, "Server is Down"
+
+
+def show_status_indicator(status, message):
+    """Display a red or green dot with status text on the Streamlit app."""
+    if status:
+        st.markdown(
+            f"""
+            <div style='display: flex; align-items: center;'>
+                <div style='width: 10px; height: 10px; background-color: green; border-radius: 50%; margin-right: 10px;'></div>
+                <p style='margin: 0; font-size: 12px;'>{message}</p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    else:
+        st.markdown(
+            f"""
+            <div style='display: flex; align-items: center;'>
+                <div style='width: 10px; height: 10px; background-color: red; border-radius: 50%; margin-right: 10px;'></div>
+                <p style='margin: 0; font-size: 12px;'>{message}</p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
 
 def page_setup():
@@ -97,6 +142,23 @@ def sidebar():
 
     with st.sidebar:
         st.title("🧪 RAG Lab")
+        # Status section with periodic updates
+        status_placeholder = st.empty()  # Placeholder for dynamic updates
+
+        # Initialize session state for periodic refresh
+        if "last_checked" not in st.session_state:
+            st.session_state.last_checked = 0
+
+        current_time = time.time()
+        if (
+            current_time - st.session_state.last_checked > 30
+        ):  # 30-second interval
+            # Update status every 30 seconds
+            status, message = check_server_status(API_BASE_URL)
+            with status_placeholder:
+                show_status_indicator(status, message)
+            st.session_state.last_checked = current_time
+
         st.divider()
         if st.button("☁️ Upload Documents", type="tertiary"):
             file_upload_dialog()
@@ -104,6 +166,8 @@ def sidebar():
             set_model_configs()
         if st.button("⚙️ Settings", type="tertiary"):
             set_model_configs()
+
+        st.divider()
 
 
 def main():
