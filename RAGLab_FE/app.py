@@ -48,47 +48,61 @@ def check_health_status() -> Optional[str]:
     pass
 
 
-def check_server_status(url):
-    """Check if the backend server is running and returns the status."""
+def check_server_status(url: str) -> tuple[bool, str, float]:
+    """Check server status with retry logic and latency measurement."""
+    if not st.session_state["auto_refresh"]:
+        return False, "Status Check Disabled", 0.0
+
     try:
-        response = requests.get(
-            url, timeout=5
-        )  # Set a timeout to avoid hanging
+        start_time = time.time()
+        response = requests.get(url, timeout=5)
+        latency = (time.time() - start_time) * 1000  # Convert to milliseconds
+
         if response.status_code == 200:
-            return True, response.json().get("message", "Server is Up")
+            return True, "Server Connected", latency
+
     except requests.exceptions.ConnectionError:
-        st.error(
-            f"Error: Unable to connect to the backend at {url} (Connection Refused)"
-        )
+        return False, "Connection Failed", 0.0
     except requests.exceptions.Timeout:
-        st.error(f"Error: Request to {url} timed out")
-    except requests.exceptions.RequestException as e:
-        st.error(f"Unexpected error: {e}")
-    return False, "Server is Down"
+        return False, "Request Timeout", 0.0
+    except requests.exceptions.RequestException:
+        return False, "Connection Error", 0.0
+
+    return False, "Server Disconnected", 0.0
 
 
-def show_status_indicator(status, message):
-    """Display a red or green dot with status text on the Streamlit app."""
-    if status:
-        st.markdown(
-            f"""
-            <div style='display: flex; align-items: center;'>
-                <div style='width: 10px; height: 10px; background-color: green; border-radius: 50%; margin-right: 10px;'></div>
-                <p style='margin: 0; font-size: 12px;'>{message}</p>
+def show_status_indicator(
+    status: bool, message: str, latency: float = None
+) -> None:
+    """Display an enhanced status indicator with latency and controls."""
+    indicator = "🟢" if status else "🔴"
+    latency_text = f" ({latency:.2f}ms)" if latency is not None else ""
+
+    st.markdown(
+        f"""
+        <div style='display: flex; align-items: center; 
+                    justify-content: space-between; padding: 8px; 
+                    border-radius: 4px; margin-bottom: 8px'>
+            <div style='display: flex; align-items: center; gap: 8px;'>
+                <span style='font-size: 8px'>{indicator}</span>
+                <span style='font-size: 12px; color: #6b7280'>
+                    {message}{latency_text}
+                </span>
             </div>
-            """,
-            unsafe_allow_html=True,
-        )
-    else:
-        st.markdown(
-            f"""
-            <div style='display: flex; align-items: center;'>
-                <div style='width: 10px; height: 10px; background-color: red; border-radius: 50%; margin-right: 10px;'></div>
-                <p style='margin: 0; font-size: 12px;'>{message}</p>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+@st.fragment(run_every="30s")
+def update_status():
+    """Update and display server status."""
+    status, message, latency = check_server_status(API_BASE_URL)
+    st.session_state.status = status
+    st.session_state.status_message = message
+    st.session_state.latency = latency
+    show_status_indicator(status, message, latency)
 
 
 def page_setup():
@@ -111,6 +125,19 @@ def page_setup():
 @st.dialog("Model Settings")
 def set_model_configs():
     st.write("Set up different model configurations")
+
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        on = st.toggle(
+            "Backend Health Check",
+            value=st.session_state.get("auto_refresh", True),
+            help="Checks if the Backend server is connected when ON",
+            key="health_check_toggle",
+        )
+        st.session_state["auto_refresh"] = on
+
+    with col2:
+        st.write("Status:", "🟢 ON" if on else "🔴 OFF")
 
 
 @st.dialog("How it works!")
@@ -142,22 +169,12 @@ def sidebar():
 
     with st.sidebar:
         st.title("🧪 RAG Lab")
-        # Status section with periodic updates
-        status_placeholder = st.empty()  # Placeholder for dynamic updates
 
-        # Initialize session state for periodic refresh
-        if "last_checked" not in st.session_state:
-            st.session_state.last_checked = 0
+        # Status indicator at the top of sidebar
+        if "auto_refresh" not in st.session_state:
+            st.session_state["auto_refresh"] = True
 
-        current_time = time.time()
-        if (
-            current_time - st.session_state.last_checked > 30
-        ):  # 30-second interval
-            # Update status every 30 seconds
-            status, message = check_server_status(API_BASE_URL)
-            with status_placeholder:
-                show_status_indicator(status, message)
-            st.session_state.last_checked = current_time
+        # update_status()
 
         st.divider()
         if st.button("☁️ Upload Documents", type="tertiary"):
@@ -167,7 +184,18 @@ def sidebar():
         if st.button("⚙️ Settings", type="tertiary"):
             set_model_configs()
 
-        st.divider()
+        # Push status to bottom using empty space
+        st.markdown(
+            '<div style="flex-grow: 1; min-height: 45vh;"></div>',
+            unsafe_allow_html=True,
+        )
+
+        # Create a container for the bottom status
+        status_container = st.container()
+        # Status indicator at the bottom
+        with status_container:
+            st.divider()
+            update_status()
 
 
 def main():
