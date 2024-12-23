@@ -1,0 +1,8 @@
+.env
+venv/
+Dockerfile
+.DS_Store
+# Exclude data or temporary storage
+data/
+volumes/
+logs/
