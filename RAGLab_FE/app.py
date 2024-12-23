@@ -80,8 +80,8 @@ def show_status_indicator(
 
     st.markdown(
         f"""
-        <div style='display: flex; align-items: center; 
-                    justify-content: space-between; padding: 8px; 
+        <div style='display: flex; align-items: center;
+                    justify-content: space-between; padding: 8px;
                     border-radius: 4px; margin-bottom: 8px'>
             <div style='display: flex; align-items: center; gap: 8px;'>
                 <span style='font-size: 8px'>{indicator}</span>
