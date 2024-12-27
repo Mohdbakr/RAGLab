@@ -12,6 +12,58 @@ This is a production-ready RAG application built using FastAPI, Streamlit, Milvu
 - **LLM:** OpenAI GPT for generating responses.
 - **Monitoring:** Attu for visualizing Milvus.
 
+## Project Structure
+
+```
+rag-lab/
+├── backend/
+│   ├── app/
+│   │   ├── __init__.py
+│   │   ├── main.py
+│   │   ├── api/
+│   │   │   ├── __init__.py
+│   │   │   ├── routes.py
+│   │   │   └── dependencies.py
+│   │   ├── core/
+│   │   │   ├── __init__.py
+│   │   │   ├── config.py
+│   │   │   └── logging.py
+│   │   ├── services/
+│   │   │   ├── __init__.py
+│   │   │   ├── embedding.py
+│   │   │   └── background.py
+│   │   └── repository/
+│   │       ├── __init__.py
+│   │       └── milvus.py
+│   ├── tests/
+│   │   ├── __init__.py
+│   │   ├── test_api.py
+│   │   └── test_services.py
+│   └── Dockerfile
+├── frontend/
+│   ├── src/
+│   │   ├── __init__.py
+│   │   ├── main.py
+│   │   ├── components/
+│   │   │   ├── __init__.py
+│   │   │   ├── chat.py
+│   │   │   └── sidebar.py
+│   │   └── utils/
+│   │       ├── __init__.py
+│   │       └── api.py
+│   └── Dockerfile
+├── config/
+│   ├── logging.yaml
+│   └── milvus.yaml
+├── docker/
+│   └── docker-compose.yml
+├── docs/
+│   ├── setup.md
+│   └── api.md
+├── logs/
+└── README.md
+```
+
 ## Setup and Deployment
 
 1.  **Clone the repository:**

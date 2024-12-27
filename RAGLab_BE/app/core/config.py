@@ -1,25 +1,44 @@
-from pydantic_settings import BaseSettings, SettingsConfigDict
-
-LOGGING_CONFIG = {"level": "INFO", "format": "%(asctime)s [%(levelname)s] %(message)s"}
+from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    """Application settings."""
 
-    URI: str
-    TOKEN: str
-    DB_NAME: str
-    COLLECTION_NAME: str
-    VECTOR_DIM: int
+    # API Configuration
+    API_V1_STR: str = "/api/v1"
+    PROJECT_NAME: str = "RAG Lab Backend"
 
+    # Milvus Configuration
+    MILVUS_URI: str
+    MILVUS_TOKEN: str
+    MILVUS_DB_NAME: str
+    MILVUS_COLLECTION_NAME: str
+    MILVUS_VECTOR_DIM: int
+
+    # Embedding Model Configuration
+    MODEL_NAME: str = "sentence-transformers/all-mpnet-base-v2"
+
+    # CORS Configuration
+    BACKEND_CORS_ORIGINS: list = ["http://localhost:8501"]
+
+    # OPENAI API Configuration
     OPENAI_API_KEY: str
+
+    # Logging Configuration
+    LOG_LEVEL: str = "INFO"
+    LOG_FORMAT: str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    LOG_FILE: str = "logs/app.log"
+
+    class Config:
+        case_sensitive = True
+        env_file = ".env"
 
 
 settings = Settings()
 
 MILVUS_CONFIG = {}
-MILVUS_CONFIG["URI"] = settings.URI
-MILVUS_CONFIG["TOKEN"] = settings.TOKEN
-MILVUS_CONFIG["DB_NAME"] = settings.DB_NAME
-MILVUS_CONFIG["COLLECTION_NAME"] = settings.COLLECTION_NAME
-MILVUS_CONFIG["VECTOR_DIM"] = settings.VECTOR_DIM
+MILVUS_CONFIG["URI"] = settings.MILVUS_URI
+MILVUS_CONFIG["TOKEN"] = settings.MILVUS_TOKEN
+MILVUS_CONFIG["DB_NAME"] = settings.MILVUS_DB_NAME
+MILVUS_CONFIG["COLLECTION_NAME"] = settings.MILVUS_COLLECTION_NAME
+MILVUS_CONFIG["VECTOR_DIM"] = settings.MILVUS_VECTOR_DIM
