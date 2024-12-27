@@ -4,8 +4,13 @@ import time
 
 import streamlit as st
 
+from config import settings
 
-API_BASE_URL: str = "http://localhost:8000/"
+# Define API endpoints
+API_BASE_URL = settings.API_BASE_URL
+UPLOAD_API_URL = settings.UPLOAD_API_URL
+SEARCH_API_URL = settings.SEARCH_API_URL
+CHAT_API_URL = settings.CHAT_API_URL
 
 
 def chat_with_backend(query: str) -> Optional[str]:
@@ -180,7 +185,7 @@ def sidebar():
         if st.button("☁️ Upload Documents", type="tertiary"):
             file_upload_dialog()
         if st.button("📖 instructions", type="tertiary"):
-            set_model_configs()
+            instructions()
         if st.button("⚙️ Settings", type="tertiary"):
             set_model_configs()
 
