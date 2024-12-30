@@ -8,35 +8,39 @@ from app.core.config import Settings
 settings = Settings()
 
 
-def setup_logging():
-    """Configure logging with file and console handlers."""
+# core/logging.py
+class SingletonLogger:
+    _instance = None
+    _initialized = False
 
-    # Create logs directory if it doesn't exist
-    Path("logs").mkdir(exist_ok=True)
+    @classmethod
+    def get_logger(cls):
+        if not cls._instance:
+            cls._instance = logging.getLogger("rag_app")
+            if not cls._initialized:
+                cls._setup_logger()
+                cls._initialized = True
+        return cls._instance
 
-    # Create logger
-    logger = logging.getLogger("rag_app")
-    logger.setLevel(settings.LOG_LEVEL)
+    @classmethod
+    def _setup_logger(cls):
+        logger = cls._instance
+        if logger.handlers:
+            return  # Prevent duplicate handlers
 
-    # Create formatters
-    formatter = logging.Formatter(settings.LOG_FORMAT)
+        logger.setLevel(settings.LOG_LEVEL)
+        formatter = logging.Formatter(settings.LOG_FORMAT)
 
-    # Create file handler
-    file_handler = RotatingFileHandler(
-        settings.LOG_FILE,
-        maxBytes=10485760,  # 10MB
-        backupCount=5,
-    )
-    file_handler.setFormatter(formatter)
-    file_handler.setLevel(settings.LOG_LEVEL)
+        # File handler
+        Path("logs").mkdir(exist_ok=True)
+        file_handler = RotatingFileHandler(
+            settings.LOG_FILE, maxBytes=10485760, backupCount=5
+        )
+        file_handler.setFormatter(formatter)
 
-    # Create console handler
-    console_handler = logging.StreamHandler(sys.stdout)
-    console_handler.setFormatter(formatter)
-    console_handler.setLevel(settings.LOG_LEVEL)
+        # Console handler
+        console_handler = logging.StreamHandler(sys.stdout)
+        console_handler.setFormatter(formatter)
 
-    # Add handlers to logger
-    logger.addHandler(file_handler)
-    logger.addHandler(console_handler)
-
-    return logger
+        logger.addHandler(file_handler)
+        logger.addHandler(console_handler)

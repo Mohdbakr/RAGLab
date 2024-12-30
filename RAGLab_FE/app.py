@@ -30,7 +30,7 @@ def chat_with_backend(query: str) -> Optional[str]:
     pass
 
 
-def upload_files(file: Any) -> str:
+def upload_files(uploaded_files: Any) -> str:
     """
     Uploads a file to the backend for processing.
 
@@ -40,7 +40,18 @@ def upload_files(file: Any) -> str:
     Returns:
         str: A message indicating the upload status or an error message.
     """
-    pass
+    for file in uploaded_files:
+        try:
+            # Prepare the file to send
+            files = {"file": (file.name, file.getvalue(), file.type)}
+            response = requests.post(UPLOAD_API_URL, files=files)
+            message = response.json()["message"]
+            if response.status_code == 200:
+                st.success(f"Success:\n {message}")
+            else:
+                st.error(f"Failed to upload: {file.name} - {response.text}")
+        except Exception as e:
+            st.error(f"An error occurred while uploading {file.name}: {e}")
 
 
 def check_health_status() -> Optional[str]:

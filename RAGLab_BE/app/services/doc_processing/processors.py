@@ -3,16 +3,16 @@ import docx
 import markdown
 
 from .interfaces import DocumentProcessor, DocumentType
-from ...core.logging import setup_logging
+from ...core.logging import SingletonLogger
 
-logger = setup_logging()
+logger = SingletonLogger.get_logger()
 
 
 class PDFProcessor(DocumentProcessor):
     """Processor for PDF files."""
 
     async def can_process(self, file_extension: str) -> bool:
-        logger.debug(f"Checking if PDF processor can handle {file_extension}")
+        logger.info(f"Checking if PDF processor can handle {file_extension}")
         return file_extension.lower() == DocumentType.PDF.value
 
     async def extract_text(self, file: str) -> str:
@@ -73,9 +73,9 @@ class ProcessorFactory:
     @classmethod
     async def get_processor(cls, file_extension: str) -> DocumentProcessor:
         """Get appropriate processor for file type."""
-        logger.debug(f"Getting processor for {file_extension}")
+        logger.info(f"Getting processor for {file_extension}")
         for processor in cls._processors.values():
             if await processor.can_process(file_extension):
-                logger.debug(f"Found {processor} for {file_extension}")
+                logger.info(f"Found {processor} for {file_extension}")
                 return processor
         raise ValueError(f"Unsupported file type: {file_extension}")

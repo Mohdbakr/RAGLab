@@ -3,12 +3,12 @@ import os
 from datetime import datetime
 
 from ..embedding import EmbeddingService
-from .interfaces import ProcessedDocument, DocumentChunk, TextChunker
+from .interfaces import ProcessedDocument, DocumentChunk
 from .processors import ProcessorFactory
-from .chunkers import OverlappingChunker
-from ...core.logging import setup_logging
+from .chunkers import TextChunker
+from ...core.logging import SingletonLogger
 
-logger = setup_logging()
+logger = SingletonLogger.get_logger()
 
 
 class DocumentProcessingPipeline:
@@ -22,7 +22,7 @@ class DocumentProcessingPipeline:
     ):
         self.embedding_service = embedding_service
         # self.vector_store = vector_store
-        self.chunker = chunker or OverlappingChunker()
+        self.chunker = chunker or TextChunker()
 
     async def process_file(
         self, file_path: str, filename: str, metadata: Dict[str, Any] = None
@@ -43,7 +43,8 @@ class DocumentProcessingPipeline:
         file_extension = os.path.splitext(filename)[1][1:]
 
         logger.info(
-            f"getting processor for file: {filename} with extension: {file_extension}"
+            f"getting processor for file: {filename} "
+            f"with extension: {file_extension}"
         )
         # Get appropriate processor
         processor = await ProcessorFactory.get_processor(file_extension)
@@ -63,13 +64,39 @@ class DocumentProcessingPipeline:
 
         # Create chunks
         logger.info(f"creating chunks from text of file: {filename}")
-        chunks = await self.chunker.chunk_text(text, base_metadata)
+        chunks = await self.chunker.chunk_text(text)
 
-        # Process chunks and store in vector database
-        logger.info(f"processing and storing chunks for file: {filename}")
-        await self._process_and_store_chunks(chunks)
+        # Process chunks
+        doc_chuks = []
+        # add vectors and chunks to metadata
+        logger.info(
+            f"adding vectors and chunks to metadata for file: {filename}"
+        )
+        for i, chunk in enumerate(chunks):
+            # Get embeddings for chunks
+            logger.info(f"getting embeddings for chunk no: {i}")
+            embedding = await self.embedding_service.get_embeddings(chunk)
 
-        return ProcessedDocument(chunks=chunks, metadata=base_metadata)
+            doc_chunk = DocumentChunk(
+                embedding=embedding, metadata=base_metadata
+            )
+
+            doc_chunk.metadata.update({"chunk": chunk})
+            doc_chuks.append(doc_chunk)
+            logger.info(
+                f"Generated chunk No {i} "
+                f"with embedding: {len(embedding)} vector length"
+            )
+
+        logger.info(
+            f"finished processing file: {filename} "
+            f"with {len(doc_chuks)} chunks"
+        )
+
+        # TODO: Implement vector store
+        # Store in vector database
+
+        return ProcessedDocument(chunks=doc_chuks)
 
     async def _process_and_store_chunks(self, chunks: List[DocumentChunk]):
         """Process chunks and store in vector database."""

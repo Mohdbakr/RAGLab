@@ -2,15 +2,14 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
-
 from sentence_transformers import SentenceTransformer
 
 from .routers.files import router as files_router
 from .core.config import Settings
-from .core.logging import setup_logging
+from .core.logging import SingletonLogger
 
 settings = Settings()
-logger = setup_logging()
+logger = SingletonLogger.get_logger()
 
 
 @asynccontextmanager
@@ -32,10 +31,11 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     lifespan=lifespan,
-    # title=settings.PROJECT_NAME,
-    # description="This is the backend API for the RAG Lab project.",
-    # version="0.1.0",
-    # docs_url=f"{settings.API_V1_STR}/docs",
+    title=settings.PROJECT_NAME,
+    description="This is the backend API for the RAG Lab project.",
+    version="0.1.0",
+    docs_url=f"{settings.API_V1_STR}/docs",
+    redoc_url=f"{settings.API_V1_STR}/redoc",
 )
 
 app.include_router(

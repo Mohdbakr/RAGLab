@@ -4,9 +4,9 @@ from typing import List
 from sentence_transformers import SentenceTransformer
 from fastapi import Depends, HTTPException, status, Request
 
-from ..core.logging import setup_logging
+from ..core.logging import SingletonLogger
 
-logger = setup_logging()
+logger = SingletonLogger.get_logger()
 
 
 class EmbeddingService:
@@ -48,6 +48,12 @@ class EmbeddingService:
         except Exception as e:
             logger.error(f"Error generating embeddings batch: {str(e)}")
             raise
+
+    def __str__(self):
+        return f"Embedding Service with model: {self.model}"
+
+    def __repr__(self):
+        return f"Embedding Service(model={self.model})"
 
 
 async def get_embedding_model(request: Request) -> SentenceTransformer:

@@ -2,10 +2,11 @@ from abc import ABC, abstractmethod
 from typing import List, Dict, Any, BinaryIO
 from dataclasses import dataclass
 from enum import Enum
+import numpy as np
 
-from ...core.logging import setup_logging
+from ...core.logging import SingletonLogger
 
-logger = setup_logging()
+logger = SingletonLogger.get_logger()
 
 
 class DocumentType(Enum):
@@ -21,7 +22,7 @@ class DocumentType(Enum):
 class DocumentChunk:
     """Represents a chunk of text from a document."""
 
-    text: str
+    embedding: np.ndarray
     metadata: Dict[str, Any]
 
 
@@ -30,7 +31,7 @@ class ProcessedDocument:
     """Represents a fully processed document with chunks."""
 
     chunks: List[DocumentChunk]
-    metadata: Dict[str, Any]
+    # metadata: Dict[str, Any]
 
 
 class DocumentProcessor(ABC):
@@ -46,16 +47,8 @@ class DocumentProcessor(ABC):
         """Extract text from the document."""
         pass
 
+    def __str__(self):
+        return f"{self.__class__.__name__} Processor"
 
-class TextChunker(ABC):
-    """Base class for text chunking strategies."""
-
-    @abstractmethod
-    async def chunk_text(
-        self, text: str, metadata: Dict[str, Any]
-    ) -> List[DocumentChunk]:
-        """Split text into chunks with metadata."""
-        logger.debug(
-            f"Chunking text with size {self.chunk_size} and overlap {self.chunk_overlap}"
-        )
-        pass
+    def __repr__(self):
+        return f"{self.__class__.__name__}Processor"

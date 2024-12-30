@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str
 
     # Logging Configuration
-    LOG_LEVEL: str = "INFO"
+    LOG_LEVEL: str = "DEBUG"
     LOG_FORMAT: str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     LOG_FILE: str = "logs/app.log"
 
