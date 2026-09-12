@@ -157,6 +157,15 @@ each build lands and as I learn what's actually worth prioritizing next.
 - **Benchmarking**: every retrieval/generation call logs a `BenchmarkEvent`
   (latency, tokens, cost, retrieved-k) via `raglab_common.BenchmarkLogger`
   to a per-project JSONL file the frontend's Benchmarks tab reads.
+- **Model-agnostic**: no project calls a vendor SDK directly. LLM calls go
+  through `raglab_common.LLMClient` (a `litellm`-backed default), so
+  swapping OpenAI for Anthropic, a local Ollama model, or anything else
+  litellm supports is a config change (`"openai/gpt-4o-mini"` →
+  `"ollama/llama3"`), not a code change. Embeddings go through the
+  separate `raglab_common.EmbeddingClient` the same way — including a
+  local, offline `sentence-transformers` option (the `local-embeddings`
+  extra) alongside API-based ones — so embedding models can be swapped
+  and compared independently of the LLM.
 - **Reset**: generic per component — `docker compose down -v && up -d` —
   rather than bespoke per-store wipe logic.
 - **Typing/docstrings/SOLID**: full type hints, `Protocol`/ABC at
