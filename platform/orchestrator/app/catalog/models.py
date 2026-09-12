@@ -27,6 +27,8 @@ class BackendSpec(BaseModel):
         health_path: HTTP path polled to tell "starting" from "healthy".
         compatible_vector_stores: ids from ``vectorstores.yaml`` this
             backend can be pointed at. Empty means not swappable.
+        compatible_embedding_services: ids from ``embedding_services.yaml``
+            this backend can be pointed at. Empty means not swappable.
         stateful: If true, Reset wipes this backend's persisted data.
         status: Delivery status, tracked as each weekend milestone lands.
     """
@@ -41,6 +43,7 @@ class BackendSpec(BaseModel):
     base_url: str
     health_path: str
     compatible_vector_stores: list[str] = []
+    compatible_embedding_services: list[str] = []
     stateful: bool = False
     status: CatalogStatus = "planned"
 
@@ -62,6 +65,30 @@ class VectorStoreSpec(BaseModel):
         compose_path: Path (from the repo root) to a compose file that
             stands up just this store.
         host: Hostname the store is reachable at once its stack is up.
+        port: Primary client port.
+        health_path: HTTP path polled for health, empty for a TCP-only
+            check.
+        status: Delivery status, tracked as each weekend milestone lands.
+    """
+
+    id: str
+    name: str
+    compose_path: str
+    host: str
+    port: int
+    health_path: str = ""
+    status: CatalogStatus = "planned"
+
+
+class EmbeddingServiceSpec(BaseModel):
+    """One entry from ``catalog/embedding_services.yaml``.
+
+    Attributes:
+        id: Unique slug.
+        name: Human-readable display name.
+        compose_path: Path (from the repo root) to a compose file that
+            stands up just this service.
+        host: Hostname the service is reachable at once its stack is up.
         port: Primary client port.
         health_path: HTTP path polled for health, empty for a TCP-only
             check.

@@ -11,6 +11,7 @@
 #   base_url                 Base URL the frontend/orchestrator uses to reach the running backend.
 #   health_path              HTTP path polled to decide "starting" vs "healthy".
 #   compatible_vector_stores List of vectorstores.yaml ids this backend can be pointed at. Empty means "not swappable".
+#   compatible_embedding_services List of embedding_services.yaml ids this backend can be pointed at. Empty means "not swappable".
 #   stateful                 If true, Reset wipes persisted data (memory/checkpoints/vector data) via `docker compose down -v && up -d`.
 #   status                   "planned" | "in_progress" | "shipped" — tracked as each weekend lands.
 
@@ -25,5 +26,6 @@ backends:
     base_url: "http://localhost:8000"
     health_path: "/"
     compatible_vector_stores: []  # locked to its own Milvus stack for now; not part of the swap-the-vector-store demo
+    compatible_embedding_services: []  # not part of the swap-the-embedding-service demo yet either
     stateful: true
     status: "in_progress"  # existing app; owner is reviewing it personally before further changes

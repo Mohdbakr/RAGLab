@@ -29,12 +29,25 @@ class BackendSpec(BaseModel):
     base_url: str
     health_path: str
     compatible_vector_stores: list[str] = []
+    compatible_embedding_services: list[str] = []
     stateful: bool = False
     status: CatalogStatus = "planned"
 
 
 class VectorStoreSpec(BaseModel):
     """Mirrors ``app.catalog.models.VectorStoreSpec`` on the orchestrator."""
+
+    id: str
+    name: str
+    compose_path: str
+    host: str
+    port: int
+    health_path: str = ""
+    status: CatalogStatus = "planned"
+
+
+class EmbeddingServiceSpec(BaseModel):
+    """Mirrors ``app.catalog.models.EmbeddingServiceSpec`` on the orchestrator."""
 
     id: str
     name: str
@@ -56,6 +69,13 @@ class VectorStoreStatus(BaseModel):
     """A vector store paired with its live lifecycle state."""
 
     spec: VectorStoreSpec
+    state: str
+
+
+class EmbeddingServiceStatus(BaseModel):
+    """An embedding service paired with its live lifecycle state."""
+
+    spec: EmbeddingServiceSpec
     state: str
 
 
@@ -94,6 +114,12 @@ class OrchestratorClient:
         response.raise_for_status()
         return [VectorStoreStatus.model_validate(item) for item in response.json()]
 
+    def list_embedding_services(self) -> list[EmbeddingServiceStatus]:
+        """Fetch every catalog embedding service with its current state."""
+        response = self._client.get(f"{self._base_url}/embedding-services")
+        response.raise_for_status()
+        return [EmbeddingServiceStatus.model_validate(item) for item in response.json()]
+
     def get_backend_status(self, backend_id: str) -> BackendStatus:
         """Fetch one backend's current state."""
         response = self._client.get(f"{self._base_url}/backends/{backend_id}")
@@ -106,9 +132,26 @@ class OrchestratorClient:
         response.raise_for_status()
         return VectorStoreStatus.model_validate(response.json())
 
-    def start_backend(self, backend_id: str, vector_store_id: str | None = None) -> None:
-        """Start a backend, optionally pointed at a vector store."""
-        body = {"vector_store_id": vector_store_id} if vector_store_id else {}
+    def get_embedding_service_status(self, embedding_service_id: str) -> EmbeddingServiceStatus:
+        """Fetch one embedding service's current state."""
+        response = self._client.get(
+            f"{self._base_url}/embedding-services/{embedding_service_id}"
+        )
+        response.raise_for_status()
+        return EmbeddingServiceStatus.model_validate(response.json())
+
+    def start_backend(
+        self,
+        backend_id: str,
+        vector_store_id: str | None = None,
+        embedding_service_id: str | None = None,
+    ) -> None:
+        """Start a backend, optionally pointed at a vector store and/or embedding service."""
+        body = {}
+        if vector_store_id:
+            body["vector_store_id"] = vector_store_id
+        if embedding_service_id:
+            body["embedding_service_id"] = embedding_service_id
         response = self._client.post(f"{self._base_url}/backends/{backend_id}/start", json=body)
         response.raise_for_status()
 
@@ -117,9 +160,18 @@ class OrchestratorClient:
         response = self._client.post(f"{self._base_url}/backends/{backend_id}/stop")
         response.raise_for_status()
 
-    def reset_backend(self, backend_id: str, vector_store_id: str | None = None) -> None:
+    def reset_backend(
+        self,
+        backend_id: str,
+        vector_store_id: str | None = None,
+        embedding_service_id: str | None = None,
+    ) -> None:
         """Wipe a backend's persisted state and bring it back up clean."""
-        body = {"vector_store_id": vector_store_id} if vector_store_id else {}
+        body = {}
+        if vector_store_id:
+            body["vector_store_id"] = vector_store_id
+        if embedding_service_id:
+            body["embedding_service_id"] = embedding_service_id
         response = self._client.post(f"{self._base_url}/backends/{backend_id}/reset", json=body)
         response.raise_for_status()
 
@@ -136,4 +188,25 @@ class OrchestratorClient:
     def reset_vector_store(self, vector_store_id: str) -> None:
         """Wipe a vector store's data and bring it back up clean."""
         response = self._client.post(f"{self._base_url}/vectorstores/{vector_store_id}/reset")
+        response.raise_for_status()
+
+    def start_embedding_service(self, embedding_service_id: str) -> None:
+        """Start an embedding service."""
+        response = self._client.post(
+            f"{self._base_url}/embedding-services/{embedding_service_id}/start"
+        )
+        response.raise_for_status()
+
+    def stop_embedding_service(self, embedding_service_id: str) -> None:
+        """Stop an embedding service."""
+        response = self._client.post(
+            f"{self._base_url}/embedding-services/{embedding_service_id}/stop"
+        )
+        response.raise_for_status()
+
+    def reset_embedding_service(self, embedding_service_id: str) -> None:
+        """Wipe an embedding service's data and bring it back up clean."""
+        response = self._client.post(
+            f"{self._base_url}/embedding-services/{embedding_service_id}/reset"
+        )
         response.raise_for_status()

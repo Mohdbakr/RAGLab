@@ -12,8 +12,13 @@ from dataclasses import dataclass, field
 import pytest
 from fastapi.testclient import TestClient
 
-from app.catalog.models import BackendSpec, VectorStoreSpec
-from app.dependencies import get_backends, get_lifecycle_service, get_vectorstores
+from app.catalog.models import BackendSpec, EmbeddingServiceSpec, VectorStoreSpec
+from app.dependencies import (
+    get_backends,
+    get_embedding_services,
+    get_lifecycle_service,
+    get_vectorstores,
+)
 from app.main import app
 from app.models.status import ComponentState
 
@@ -30,6 +35,7 @@ def backend(**overrides: object) -> BackendSpec:
         "base_url": "http://localhost:9003",
         "health_path": "/healthz",
         "compatible_vector_stores": ["chroma"],
+        "compatible_embedding_services": ["00-embedding-service"],
     }
     fields.update(overrides)
     return BackendSpec(**fields)  # type: ignore[arg-type]
@@ -48,6 +54,19 @@ def vector_store(**overrides: object) -> VectorStoreSpec:
     return VectorStoreSpec(**fields)  # type: ignore[arg-type]
 
 
+def embedding_service(**overrides: object) -> EmbeddingServiceSpec:
+    fields: dict[str, object] = {
+        "id": "00-embedding-service",
+        "name": "Embedding Service",
+        "compose_path": "projects/00-embedding-service/docker-compose.yml",
+        "host": "localhost",
+        "port": 9100,
+        "health_path": "/healthz",
+    }
+    fields.update(overrides)
+    return EmbeddingServiceSpec(**fields)  # type: ignore[arg-type]
+
+
 @dataclass
 class FakeLifecycleService:
     state: ComponentState = ComponentState.STOPPED
@@ -61,6 +80,9 @@ class FakeLifecycleService:
     start_vector_store_calls: list[VectorStoreSpec] = field(default_factory=list)
     stop_vector_store_calls: list[VectorStoreSpec] = field(default_factory=list)
     reset_vector_store_calls: list[VectorStoreSpec] = field(default_factory=list)
+    start_embedding_service_calls: list[EmbeddingServiceSpec] = field(default_factory=list)
+    stop_embedding_service_calls: list[EmbeddingServiceSpec] = field(default_factory=list)
+    reset_embedding_service_calls: list[EmbeddingServiceSpec] = field(default_factory=list)
 
     def start_backend(self, spec: BackendSpec, env: dict[str, str] | None = None) -> None:
         self.start_backend_calls.append((spec, env))
@@ -86,6 +108,18 @@ class FakeLifecycleService:
     async def get_vector_store_status(self, spec: VectorStoreSpec) -> ComponentState:
         return self.state
 
+    def start_embedding_service(self, spec: EmbeddingServiceSpec) -> None:
+        self.start_embedding_service_calls.append(spec)
+
+    def stop_embedding_service(self, spec: EmbeddingServiceSpec) -> None:
+        self.stop_embedding_service_calls.append(spec)
+
+    def reset_embedding_service(self, spec: EmbeddingServiceSpec) -> None:
+        self.reset_embedding_service_calls.append(spec)
+
+    async def get_embedding_service_status(self, spec: EmbeddingServiceSpec) -> ComponentState:
+        return self.state
+
 
 @pytest.fixture
 def lifecycle() -> FakeLifecycleService:
@@ -96,6 +130,7 @@ def lifecycle() -> FakeLifecycleService:
 def client(lifecycle: FakeLifecycleService) -> Generator[TestClient, None, None]:
     app.dependency_overrides[get_backends] = lambda: [backend()]
     app.dependency_overrides[get_vectorstores] = lambda: [vector_store()]
+    app.dependency_overrides[get_embedding_services] = lambda: [embedding_service()]
     app.dependency_overrides[get_lifecycle_service] = lambda: lifecycle
     with TestClient(app) as test_client:
         yield test_client
@@ -155,6 +190,54 @@ class TestBackendsRouter:
         assert response.status_code == 400
         assert lifecycle.start_backend_calls == []
 
+    def test_start_with_a_compatible_embedding_service_forwards_its_connection_env(
+        self, client: TestClient, lifecycle: FakeLifecycleService
+    ) -> None:
+        response = client.post(
+            "/backends/03-production-rag-reference/start",
+            json={"embedding_service_id": "00-embedding-service"},
+        )
+
+        assert response.status_code == 202
+        (_, env) = lifecycle.start_backend_calls[0]
+        assert env == {
+            "EMBEDDING_SERVICE_ID": "00-embedding-service",
+            "EMBEDDING_SERVICE_HOST": "localhost",
+            "EMBEDDING_SERVICE_PORT": "9100",
+            "EMBEDDING_SERVICE_URL": "http://localhost:9100",
+        }
+
+    def test_start_with_an_incompatible_embedding_service_is_rejected(
+        self, client: TestClient, lifecycle: FakeLifecycleService
+    ) -> None:
+        response = client.post(
+            "/backends/03-production-rag-reference/start",
+            json={"embedding_service_id": "nope"},
+        )
+
+        assert response.status_code == 400
+        assert lifecycle.start_backend_calls == []
+
+    def test_start_with_both_a_vector_store_and_an_embedding_service_merges_their_env(
+        self, client: TestClient, lifecycle: FakeLifecycleService
+    ) -> None:
+        response = client.post(
+            "/backends/03-production-rag-reference/start",
+            json={"vector_store_id": "chroma", "embedding_service_id": "00-embedding-service"},
+        )
+
+        assert response.status_code == 202
+        (_, env) = lifecycle.start_backend_calls[0]
+        assert env == {
+            "VECTOR_STORE_ID": "chroma",
+            "VECTOR_STORE_HOST": "localhost",
+            "VECTOR_STORE_PORT": "8000",
+            "EMBEDDING_SERVICE_ID": "00-embedding-service",
+            "EMBEDDING_SERVICE_HOST": "localhost",
+            "EMBEDDING_SERVICE_PORT": "9100",
+            "EMBEDDING_SERVICE_URL": "http://localhost:9100",
+        }
+
     def test_stop_delegates_to_the_lifecycle_service(
         self, client: TestClient, lifecycle: FakeLifecycleService
     ) -> None:
@@ -203,3 +286,36 @@ class TestVectorStoresRouter:
 
     def test_get_unknown_vector_store_is_404(self, client: TestClient) -> None:
         assert client.get("/vectorstores/does-not-exist").status_code == 404
+
+
+class TestEmbeddingServicesRouter:
+    def test_list_returns_every_catalog_embedding_service_with_its_state(
+        self, client: TestClient, lifecycle: FakeLifecycleService
+    ) -> None:
+        lifecycle.state = ComponentState.STARTING
+
+        response = client.get("/embedding-services")
+
+        assert response.status_code == 200
+        [entry] = response.json()
+        assert entry["spec"]["id"] == "00-embedding-service"
+        assert entry["state"] == "starting"
+
+    def test_start_delegates_to_the_lifecycle_service(
+        self, client: TestClient, lifecycle: FakeLifecycleService
+    ) -> None:
+        response = client.post("/embedding-services/00-embedding-service/start")
+
+        assert response.status_code == 202
+        assert len(lifecycle.start_embedding_service_calls) == 1
+
+    def test_reset_delegates_to_the_lifecycle_service(
+        self, client: TestClient, lifecycle: FakeLifecycleService
+    ) -> None:
+        response = client.post("/embedding-services/00-embedding-service/reset")
+
+        assert response.status_code == 202
+        assert len(lifecycle.reset_embedding_service_calls) == 1
+
+    def test_get_unknown_embedding_service_is_404(self, client: TestClient) -> None:
+        assert client.get("/embedding-services/does-not-exist").status_code == 404

@@ -8,8 +8,8 @@ import pytest
 import yaml
 from pydantic import ValidationError
 
-from app.catalog.loader import load_backends, load_vectorstores
-from app.catalog.models import BackendSpec, VectorStoreSpec
+from app.catalog.loader import load_backends, load_embedding_services, load_vectorstores
+from app.catalog.models import BackendSpec, EmbeddingServiceSpec, VectorStoreSpec
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
@@ -149,3 +149,58 @@ class TestLoadVectorStores:
     def test_loads_the_real_repo_catalog(self) -> None:
         stores = load_vectorstores(REPO_ROOT / "catalog" / "vectorstores.yaml")
         assert stores == []  # nothing shipped yet, per the plan
+
+
+class TestLoadEmbeddingServices:
+    def test_loads_a_well_formed_catalog(self, tmp_path: Path) -> None:
+        write_yaml(
+            tmp_path / "embedding_services.yaml",
+            {
+                "embedding_services": [
+                    {
+                        "id": "00-embedding-service",
+                        "name": "Embedding Service",
+                        "compose_path": "projects/00-embedding-service/docker-compose.yml",
+                        "host": "localhost",
+                        "port": 9100,
+                        "health_path": "/healthz",
+                        "status": "shipped",
+                    }
+                ]
+            },
+        )
+
+        services = load_embedding_services(tmp_path / "embedding_services.yaml")
+
+        assert services == [
+            EmbeddingServiceSpec(
+                id="00-embedding-service",
+                name="Embedding Service",
+                compose_path="projects/00-embedding-service/docker-compose.yml",
+                host="localhost",
+                port=9100,
+                health_path="/healthz",
+                status="shipped",
+            )
+        ]
+
+    def test_empty_catalog_is_valid(self, tmp_path: Path) -> None:
+        write_yaml(tmp_path / "embedding_services.yaml", {"embedding_services": []})
+        assert load_embedding_services(tmp_path / "embedding_services.yaml") == []
+
+    def test_rejects_duplicate_ids(self, tmp_path: Path) -> None:
+        entry = {
+            "id": "dup",
+            "name": "Dup",
+            "compose_path": "projects/dup/docker-compose.yml",
+            "host": "localhost",
+            "port": 1,
+        }
+        write_yaml(tmp_path / "embedding_services.yaml", {"embedding_services": [entry, entry]})
+
+        with pytest.raises(ValueError, match="duplicate"):
+            load_embedding_services(tmp_path / "embedding_services.yaml")
+
+    def test_loads_the_real_repo_catalog(self) -> None:
+        services = load_embedding_services(REPO_ROOT / "catalog" / "embedding_services.yaml")
+        assert any(s.id == "00-embedding-service" for s in services)

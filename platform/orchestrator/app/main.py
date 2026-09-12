@@ -8,9 +8,10 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from raglab_common import configure_logging
 
-from app.catalog.loader import load_backends, load_vectorstores
+from app.catalog.loader import load_backends, load_embedding_services, load_vectorstores
 from app.core.config import get_settings
 from app.routers import backends as backends_router
+from app.routers import embedding_services as embedding_services_router
 from app.routers import vectorstores as vectorstores_router
 from app.runtime.docker_compose_runtime import DockerComposeRuntime
 from app.runtime.health import HealthChecker
@@ -25,15 +26,20 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
     app.state.backends = load_backends(settings.catalog_dir / "backends.yaml")
     app.state.vectorstores = load_vectorstores(settings.catalog_dir / "vectorstores.yaml")
+    app.state.embedding_services = load_embedding_services(
+        settings.catalog_dir / "embedding_services.yaml"
+    )
     app.state.lifecycle_service = LifecycleService(
         runtime=DockerComposeRuntime(),
         health_checker=HealthChecker(),
         repo_root=settings.repo_root,
     )
     log.info(
-        "orchestrator ready: {} backend(s), {} vector store(s) in the catalog",
+        "orchestrator ready: {} backend(s), {} vector store(s), {} embedding service(s) "
+        "in the catalog",
         len(app.state.backends),
         len(app.state.vectorstores),
+        len(app.state.embedding_services),
     )
     yield
 
@@ -46,6 +52,7 @@ app = FastAPI(
 )
 app.include_router(backends_router.router)
 app.include_router(vectorstores_router.router)
+app.include_router(embedding_services_router.router)
 
 
 @app.get("/healthz", tags=["Health"])

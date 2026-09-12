@@ -10,7 +10,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from pathlib import Path
 
-from app.catalog.models import BackendSpec, VectorStoreSpec
+from app.catalog.models import BackendSpec, EmbeddingServiceSpec, VectorStoreSpec
 from app.models.status import ComponentState
 from app.runtime.protocol import ContainerRuntime, HealthCheck
 
@@ -44,6 +44,9 @@ class LifecycleService:
         return self._repo_root / spec.path / spec.compose_file
 
     def _vector_store_compose_path(self, spec: VectorStoreSpec) -> Path:
+        return self._repo_root / spec.compose_path
+
+    def _embedding_service_compose_path(self, spec: EmbeddingServiceSpec) -> Path:
         return self._repo_root / spec.compose_path
 
     # -- generic start/stop/reset/status, shared by both catalog kinds --
@@ -158,3 +161,45 @@ class LifecycleService:
             f"http://{spec.host}:{spec.port}{spec.health_path}" if spec.health_path else None
         )
         return await self._status(self._vector_store_compose_path(spec), health_url)
+
+    # -- embedding services ----------------------------------------------
+
+    def start_embedding_service(self, spec: EmbeddingServiceSpec) -> None:
+        """Start an embedding service's stack.
+
+        Args:
+            spec: The embedding service to start.
+        """
+        self._start(self._embedding_service_compose_path(spec), None)
+
+    def stop_embedding_service(self, spec: EmbeddingServiceSpec) -> None:
+        """Stop an embedding service's stack.
+
+        Args:
+            spec: The embedding service to stop.
+        """
+        self._stop(self._embedding_service_compose_path(spec))
+
+    def reset_embedding_service(self, spec: EmbeddingServiceSpec) -> None:
+        """Wipe an embedding service's data and bring it back up clean.
+
+        Args:
+            spec: The embedding service to reset.
+        """
+        self._reset(self._embedding_service_compose_path(spec), None)
+
+    async def get_embedding_service_status(self, spec: EmbeddingServiceSpec) -> ComponentState:
+        """Report an embedding service's current lifecycle state.
+
+        Args:
+            spec: The embedding service to check.
+
+        Returns:
+            ``STOPPED`` if no container is running; ``HEALTHY`` once
+            running if the service declares no ``health_path`` to probe;
+            otherwise ``STARTING``/``HEALTHY`` based on that probe.
+        """
+        health_url = (
+            f"http://{spec.host}:{spec.port}{spec.health_path}" if spec.health_path else None
+        )
+        return await self._status(self._embedding_service_compose_path(spec), health_url)

@@ -12,7 +12,7 @@ from typing import Any
 
 import yaml
 
-from app.catalog.models import BackendSpec, VectorStoreSpec
+from app.catalog.models import BackendSpec, EmbeddingServiceSpec, VectorStoreSpec
 
 
 def _read_yaml(path: Path) -> dict[str, Any]:
@@ -71,4 +71,27 @@ def load_vectorstores(catalog_path: Path) -> list[VectorStoreSpec]:
     raw = _read_yaml(catalog_path)
     specs = [VectorStoreSpec.model_validate(entry) for entry in raw.get("vectorstores", [])]
     _require_unique_ids([spec.id for spec in specs], kind="vector store")
+    return specs
+
+
+def load_embedding_services(catalog_path: Path) -> list[EmbeddingServiceSpec]:
+    """Load and validate every entry from an ``embedding_services.yaml`` file.
+
+    Args:
+        catalog_path: Path to the YAML file.
+
+    Returns:
+        The catalog's embedding services, in file order. An empty list if
+        the file doesn't exist or declares none yet.
+
+    Raises:
+        pydantic.ValidationError: If an entry fails schema validation.
+        ValueError: If two entries share the same ``id``.
+    """
+    raw = _read_yaml(catalog_path)
+    specs = [
+        EmbeddingServiceSpec.model_validate(entry)
+        for entry in raw.get("embedding_services", [])
+    ]
+    _require_unique_ids([spec.id for spec in specs], kind="embedding service")
     return specs

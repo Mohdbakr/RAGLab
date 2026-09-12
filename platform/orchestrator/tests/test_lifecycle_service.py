@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from app.catalog.models import BackendSpec, VectorStoreSpec
+from app.catalog.models import BackendSpec, EmbeddingServiceSpec, VectorStoreSpec
 from app.models.status import ComponentState
 from app.services.lifecycle import LifecycleService
 
@@ -88,6 +88,19 @@ def chroma_store(**overrides: object) -> VectorStoreSpec:
     }
     fields.update(overrides)
     return VectorStoreSpec(**fields)  # type: ignore[arg-type]
+
+
+def embedding_service(**overrides: object) -> EmbeddingServiceSpec:
+    fields: dict[str, object] = {
+        "id": "00-embedding-service",
+        "name": "Embedding Service",
+        "compose_path": "projects/00-embedding-service/docker-compose.yml",
+        "host": "localhost",
+        "port": 9100,
+        "health_path": "/healthz",
+    }
+    fields.update(overrides)
+    return EmbeddingServiceSpec(**fields)  # type: ignore[arg-type]
 
 
 class TestBackendLifecycle:
@@ -219,4 +232,45 @@ class TestVectorStoreLifecycle:
 
         assert (
             await service.get_vector_store_status(chroma_store()) is ComponentState.STOPPED
+        )
+
+
+class TestEmbeddingServiceLifecycle:
+    def test_start_resolves_compose_path_from_repo_root(self) -> None:
+        runtime = FakeRuntime()
+        service = LifecycleService(runtime, FakeHealthChecker(), repo_root=REPO_ROOT)
+
+        service.start_embedding_service(embedding_service())
+
+        (call,) = runtime.up_calls
+        assert call[0] == REPO_ROOT / "projects/00-embedding-service/docker-compose.yml"
+
+    def test_reset_tears_down_with_volumes_then_brings_back_up(self) -> None:
+        runtime = FakeRuntime(running=True)
+        service = LifecycleService(runtime, FakeHealthChecker(), repo_root=REPO_ROOT)
+
+        service.reset_embedding_service(embedding_service())
+
+        assert runtime.down_calls[0][1] is True
+        assert len(runtime.up_calls) == 1
+
+    @pytest.mark.asyncio
+    async def test_status_probes_health_url_built_from_host_and_port(self) -> None:
+        runtime = FakeRuntime(running=True)
+        health = FakeHealthChecker(healthy=True)
+        service = LifecycleService(runtime, health, repo_root=REPO_ROOT)
+
+        spec = embedding_service()
+        await service.get_embedding_service_status(spec)
+
+        assert health.probed_urls == [f"http://{spec.host}:{spec.port}{spec.health_path}"]
+
+    @pytest.mark.asyncio
+    async def test_status_is_stopped_when_not_running(self) -> None:
+        runtime = FakeRuntime(running=False)
+        service = LifecycleService(runtime, FakeHealthChecker(), repo_root=REPO_ROOT)
+
+        assert (
+            await service.get_embedding_service_status(embedding_service())
+            is ComponentState.STOPPED
         )

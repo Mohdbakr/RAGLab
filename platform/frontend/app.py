@@ -38,15 +38,16 @@ def _state_badge(state: str) -> str:
     return f"{_STATE_ICONS.get(state, '⚪')} {state}"
 
 
-def render_sidebar(client: OrchestratorClient) -> tuple[str | None, str | None]:
-    """Render the backend/vector-store pickers and lifecycle controls.
+def render_sidebar(client: OrchestratorClient) -> tuple[str | None, str | None, str | None]:
+    """Render the backend/vector-store/embedding-service pickers and lifecycle controls.
 
     Args:
         client: The orchestrator client to query and act through.
 
     Returns:
-        The currently selected (backend_id, vector_store_id); either may
-        be None if nothing is selectable yet.
+        The currently selected (backend_id, vector_store_id,
+        embedding_service_id); any may be None if nothing is selectable
+        yet.
     """
     st.sidebar.title("🧪 RAGLab")
     st.sidebar.caption("Pick a backend, launch it, try it.")
@@ -56,11 +57,11 @@ def render_sidebar(client: OrchestratorClient) -> tuple[str | None, str | None]:
     except Exception as exc:  # noqa: BLE001 - surfaced to the user, not swallowed
         st.sidebar.error(f"Can't reach the orchestrator: {exc}")
         log.warning("failed to list backends: {}", exc)
-        return None, None
+        return None, None, None
 
     if not backends:
         st.sidebar.warning("No backends in the catalog yet.")
-        return None, None
+        return None, None, None
 
     options = {f"{b.spec.name} ({b.spec.level})": b for b in backends}
     chosen = st.sidebar.selectbox("Backend", list(options.keys()))
@@ -74,16 +75,24 @@ def render_sidebar(client: OrchestratorClient) -> tuple[str | None, str | None]:
     else:
         st.sidebar.caption("This backend doesn't use the shared vector-store slot.")
 
+    embedding_service_id: str | None = None
+    if backend.compatible_embedding_services:
+        embedding_service_id = st.sidebar.selectbox(
+            "Embedding service", backend.compatible_embedding_services
+        )
+    else:
+        st.sidebar.caption("This backend doesn't use the shared embedding-service slot.")
+
     launch_col, stop_col, reset_col = st.sidebar.columns(3)
     if launch_col.button("▶ Launch", use_container_width=True):
         with st.spinner("Starting..."):
-            launch(client, backend.id, vector_store_id)
+            launch(client, backend.id, vector_store_id, embedding_service_id)
         st.rerun()
     if stop_col.button("■ Stop", use_container_width=True):
-        stop(client, backend.id, vector_store_id)
+        stop(client, backend.id, vector_store_id, embedding_service_id)
         st.rerun()
     if reset_col.button("⟲ Reset", use_container_width=True):
-        reset(client, backend.id, vector_store_id)
+        reset(client, backend.id, vector_store_id, embedding_service_id)
         st.rerun()
 
     st.sidebar.divider()
@@ -99,8 +108,15 @@ def render_sidebar(client: OrchestratorClient) -> tuple[str | None, str | None]:
         except Exception as exc:  # noqa: BLE001
             st.sidebar.write("Vector store: unknown")
             log.debug("status check failed for {}: {}", vector_store_id, exc)
+    if embedding_service_id:
+        try:
+            es_state = client.get_embedding_service_status(embedding_service_id).state
+            st.sidebar.write(f"Embedding service: {_state_badge(es_state)}")
+        except Exception as exc:  # noqa: BLE001
+            st.sidebar.write("Embedding service: unknown")
+            log.debug("status check failed for {}: {}", embedding_service_id, exc)
 
-    return backend.id, vector_store_id
+    return backend.id, vector_store_id, embedding_service_id
 
 
 def render_main(
@@ -144,7 +160,7 @@ def main() -> None:
     """Entry point Streamlit runs."""
     page_setup()
     client = get_client()
-    backend_id, vector_store_id = render_sidebar(client)
+    backend_id, vector_store_id, _embedding_service_id = render_sidebar(client)
     render_main(client, backend_id, vector_store_id)
 
 

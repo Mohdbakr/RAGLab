@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from fastapi import Request
 
-from app.catalog.models import BackendSpec, VectorStoreSpec
+from app.catalog.models import BackendSpec, EmbeddingServiceSpec, VectorStoreSpec
 from app.services.lifecycle import LifecycleService
 
 
@@ -21,6 +21,11 @@ def get_backends(request: Request) -> list[BackendSpec]:
 def get_vectorstores(request: Request) -> list[VectorStoreSpec]:
     """Return the vector-store catalog loaded at startup."""
     return request.app.state.vectorstores  # type: ignore[no-any-return]
+
+
+def get_embedding_services(request: Request) -> list[EmbeddingServiceSpec]:
+    """Return the embedding-service catalog loaded at startup."""
+    return request.app.state.embedding_services  # type: ignore[no-any-return]
 
 
 def get_lifecycle_service(request: Request) -> LifecycleService:

@@ -11,6 +11,7 @@ import pytest
 
 from raglab_frontend.orchestrator_client import (
     BackendStatus,
+    EmbeddingServiceStatus,
     OrchestratorClient,
     VectorStoreStatus,
 )
@@ -42,6 +43,19 @@ VECTOR_STORE_PAYLOAD = {
         "port": 8000,
         "health_path": "/api/v1/heartbeat",
         "status": "planned",
+    },
+    "state": "stopped",
+}
+
+EMBEDDING_SERVICE_PAYLOAD = {
+    "spec": {
+        "id": "00-embedding-service",
+        "name": "Embedding Service",
+        "compose_path": "projects/00-embedding-service/docker-compose.yml",
+        "host": "localhost",
+        "port": 9100,
+        "health_path": "/healthz",
+        "status": "shipped",
     },
     "state": "stopped",
 }
@@ -97,6 +111,20 @@ class TestListVectorStores:
         assert status.state == "stopped"
 
 
+class TestListEmbeddingServices:
+    def test_parses_the_list_response(self) -> None:
+        transport = recording_handler(
+            [], httpx.Response(200, json=[EMBEDDING_SERVICE_PAYLOAD])
+        )
+        client = client_with(transport)
+
+        [status] = client.list_embedding_services()
+
+        assert isinstance(status, EmbeddingServiceStatus)
+        assert status.spec.id == "00-embedding-service"
+        assert status.state == "stopped"
+
+
 class TestGetOneStatus:
     def test_get_backend_status_parses_the_response(self) -> None:
         calls: list[httpx.Request] = []
@@ -117,6 +145,18 @@ class TestGetOneStatus:
 
         assert status.state == "stopped"
         assert calls[0].url.path == "/vectorstores/chroma"
+
+    def test_get_embedding_service_status_parses_the_response(self) -> None:
+        calls: list[httpx.Request] = []
+        transport = recording_handler(
+            calls, httpx.Response(200, json=EMBEDDING_SERVICE_PAYLOAD)
+        )
+        client = client_with(transport)
+
+        status = client.get_embedding_service_status("00-embedding-service")
+
+        assert status.state == "stopped"
+        assert calls[0].url.path == "/embedding-services/00-embedding-service"
 
 
 class TestStartBackend:
@@ -142,6 +182,21 @@ class TestStartBackend:
         client.start_backend("03-production-rag-reference", vector_store_id="chroma")
 
         assert calls[0].content == b'{"vector_store_id":"chroma"}'
+
+    def test_posts_both_ids_when_both_are_chosen(self) -> None:
+        calls: list[httpx.Request] = []
+        transport = recording_handler(calls, httpx.Response(202, json={"state": "starting"}))
+        client = client_with(transport)
+
+        client.start_backend(
+            "03-production-rag-reference",
+            vector_store_id="chroma",
+            embedding_service_id="00-embedding-service",
+        )
+
+        assert calls[0].content == (
+            b'{"vector_store_id":"chroma","embedding_service_id":"00-embedding-service"}'
+        )
 
 
 class TestStopAndResetBackend:
@@ -181,4 +236,21 @@ class TestVectorStoreLifecycle:
             "/vectorstores/chroma/start",
             "/vectorstores/chroma/stop",
             "/vectorstores/chroma/reset",
+        ]
+
+
+class TestEmbeddingServiceLifecycle:
+    def test_start_stop_reset_hit_the_expected_paths(self) -> None:
+        calls: list[httpx.Request] = []
+        transport = recording_handler(calls, httpx.Response(202, json={"state": "starting"}))
+        client = client_with(transport)
+
+        client.start_embedding_service("00-embedding-service")
+        client.stop_embedding_service("00-embedding-service")
+        client.reset_embedding_service("00-embedding-service")
+
+        assert [c.url.path for c in calls] == [
+            "/embedding-services/00-embedding-service/start",
+            "/embedding-services/00-embedding-service/stop",
+            "/embedding-services/00-embedding-service/reset",
         ]
