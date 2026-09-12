@@ -88,6 +88,10 @@ weekend's build lands and as real usage suggests better priorities.
   rather than bespoke per-store wipe logic.
 - **Typing/docstrings/SOLID**: full type hints, `Protocol`/ABC at
   integration seams, Google-style docstrings, checked with `ruff` + `mypy --strict`.
+- **CLI**: `typer` where a project exposes one (e.g. 01's `python -m ragscratch ask "..."`) —
+  it derives the CLI directly from type-hinted function signatures rather
+  than a separate `argparse`/`click` parser definition, so the interface
+  and its types can't drift apart.
 
 `02-document-qa-foundation` is the one exception to all of the above for
 now — untouched until its owner finishes reviewing it.
