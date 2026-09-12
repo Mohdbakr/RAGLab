@@ -41,6 +41,10 @@ class TestBenchmarkEvent:
         with pytest.raises(ValidationError):
             make_event(operation="not-a-real-operation")
 
+    def test_accepts_embed_operation(self) -> None:
+        event = make_event(operation="embed")
+        assert event.operation == "embed"
+
     def test_rejects_negative_latency(self) -> None:
         with pytest.raises(ValidationError):
             make_event(latency_ms=-1.0)

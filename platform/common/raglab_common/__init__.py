@@ -3,6 +3,7 @@
 from raglab_common.benchmarking import BenchmarkEvent, BenchmarkLogger
 from raglab_common.embeddings import (
     EmbeddingClient,
+    HTTPEmbeddingClient,
     LiteLLMEmbeddingClient,
     SentenceTransformerEmbeddingClient,
     build_embedding_client,
@@ -16,6 +17,7 @@ __all__ = [
     "BenchmarkLogger",
     "ChatMessage",
     "EmbeddingClient",
+    "HTTPEmbeddingClient",
     "LLMClient",
     "LLMResponse",
     "LiteLLMClient",

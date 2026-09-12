@@ -9,15 +9,18 @@ Two things are faked so these stay fast, free, and offline:
 
 from __future__ import annotations
 
+import json
 import sys
 import types
 from dataclasses import dataclass, field
 from typing import Any
 
+import httpx
 import pytest
 
 from raglab_common.embeddings import (
     EmbeddingClient,
+    HTTPEmbeddingClient,
     LiteLLMEmbeddingClient,
     SentenceTransformerEmbeddingClient,
     build_embedding_client,
@@ -106,6 +109,69 @@ class TestSentenceTransformerEmbeddingClient:
         assert client._model.encode_calls == [["hi", "there!"]]
 
 
+class TestHTTPEmbeddingClient:
+    def test_satisfies_the_protocol(self) -> None:
+        client = HTTPEmbeddingClient(base_url="http://localhost:9100")
+        assert isinstance(client, EmbeddingClient)
+
+    @pytest.mark.asyncio
+    async def test_embed_posts_texts_and_returns_the_vectors(self) -> None:
+        captured: dict[str, Any] = {}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            captured["url"] = str(request.url)
+            captured["body"] = json.loads(request.content)
+            return httpx.Response(
+                200,
+                json={"model": "local/all-mpnet-base-v2", "embeddings": [[0.1, 0.2]]},
+            )
+
+        client = HTTPEmbeddingClient(
+            base_url="http://localhost:9100",
+            client=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
+        )
+
+        vectors = await client.embed(["hello"])
+
+        assert vectors == [[0.1, 0.2]]
+        assert captured["url"] == "http://localhost:9100/embed"
+        assert captured["body"] == {"texts": ["hello"]}
+
+    @pytest.mark.asyncio
+    async def test_embed_includes_the_model_override_when_set(self) -> None:
+        captured: dict[str, Any] = {}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            captured["body"] = json.loads(request.content)
+            return httpx.Response(
+                200,
+                json={"model": "openai/text-embedding-3-small", "embeddings": [[0.1]]},
+            )
+
+        client = HTTPEmbeddingClient(
+            base_url="http://localhost:9100",
+            model="openai/text-embedding-3-small",
+            client=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
+        )
+
+        await client.embed(["hi"])
+
+        assert captured["body"] == {"texts": ["hi"], "model": "openai/text-embedding-3-small"}
+
+    @pytest.mark.asyncio
+    async def test_raises_on_a_server_error(self) -> None:
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(500)
+
+        client = HTTPEmbeddingClient(
+            base_url="http://localhost:9100",
+            client=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
+        )
+
+        with pytest.raises(httpx.HTTPStatusError):
+            await client.embed(["hi"])
+
+
 class TestBuildEmbeddingClient:
     def test_local_prefix_builds_a_sentence_transformer_client(
         self, fake_sentence_transformers_module: type
@@ -120,3 +186,14 @@ class TestBuildEmbeddingClient:
 
         assert isinstance(client, LiteLLMEmbeddingClient)
         assert client._model == "openai/text-embedding-3-small"
+
+    def test_http_prefix_builds_an_http_client(self) -> None:
+        client = build_embedding_client("http://localhost:9100")
+
+        assert isinstance(client, HTTPEmbeddingClient)
+        assert client._base_url == "http://localhost:9100"
+
+    def test_https_prefix_also_builds_an_http_client(self) -> None:
+        client = build_embedding_client("https://embeddings.example.com")
+
+        assert isinstance(client, HTTPEmbeddingClient)

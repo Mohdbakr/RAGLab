@@ -18,7 +18,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
-BenchmarkOperation = Literal["ingest", "retrieve", "generate"]
+BenchmarkOperation = Literal["ingest", "retrieve", "generate", "embed"]
 
 
 def _utcnow() -> datetime:

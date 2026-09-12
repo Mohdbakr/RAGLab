@@ -16,8 +16,9 @@ jobs:
           - platform/common
           - platform/orchestrator
           - platform/frontend
-          # projects/* join this matrix as each weekend milestone ships a
-          # pyproject.toml with lint/type/test config. 02-document-qa-foundation
+          - projects/00-embedding-service
+          # further projects/* join this matrix as each weekend milestone ships
+          # a pyproject.toml with lint/type/test config. 02-document-qa-foundation
           # is intentionally excluded until its owner finishes reviewing it.
     steps:
       - uses: actions/checkout@v4

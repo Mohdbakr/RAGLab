@@ -109,6 +109,7 @@ RAGLab/
 │   ├── orchestrator/     # drives docker compose to start/stop/reset things
 │   └── frontend/         # the unified launcher UI
 └── projects/
+    ├── 00-embedding-service/
     ├── 01-rag-from-scratch/
     ├── 02-document-qa-foundation/
     └── ...
@@ -150,6 +151,17 @@ one production platform.
 This table is a living roadmap, not a locked commitment — I revise it as
 each build lands and as I learn what's actually worth prioritizing next.
 
+## Supporting services
+
+Not every project is a "RAG pattern to compare" — some are shared
+infrastructure other projects can *optionally* call instead of doing
+something in-process. These are numbered `00` and don't appear in the
+basic→advanced table above, and nothing depends on them being up.
+
+| Project | What it shows | Status | Tracking |
+|---|---|---|---|
+| [00 — Embedding Service](projects/00-embedding-service) | Standalone, model-swappable embedding microservice — the production pattern of running embeddings as their own scaled service, called over HTTP via `raglab_common.HTTPEmbeddingClient` | shipped | [#15](https://github.com/Mohdbakr/RAGLab/issues/15) |
+
 ## Standards every project follows
 
 - **TDD**: tests written before implementation, red confirmed before green.
@@ -164,8 +176,10 @@ each build lands and as I learn what's actually worth prioritizing next.
   `"ollama/llama3"`), not a code change. Embeddings go through the
   separate `raglab_common.EmbeddingClient` the same way — including a
   local, offline `sentence-transformers` option (the `local-embeddings`
-  extra) alongside API-based ones — so embedding models can be swapped
-  and compared independently of the LLM.
+  extra) and an `HTTPEmbeddingClient` that calls the standalone
+  [Embedding Service](projects/00-embedding-service), alongside API-based
+  ones — so embedding models (and where they run) can be swapped and
+  compared independently of the LLM.
 - **Reset**: generic per component — `docker compose down -v && up -d` —
   rather than bespoke per-store wipe logic.
 - **Typing/docstrings/SOLID**: full type hints, `Protocol`/ABC at

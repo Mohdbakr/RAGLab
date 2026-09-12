@@ -1,0 +1,17 @@
+# Standalone: `docker compose up --build` from this directory runs just
+# the embedding service, no other RAGLab project or the launcher required.
+
+name: raglab-embedding-service
+
+services:
+  embedding-service:
+    build:
+      context: ../..
+      dockerfile: projects/00-embedding-service/Dockerfile
+    container_name: raglab_embedding_service
+    environment:
+      # Picked up from a .env file next to this compose file if you make
+      # one (see .env.example); otherwise this default is used.
+      DEFAULT_EMBEDDING_MODEL: ${DEFAULT_EMBEDDING_MODEL:-local/all-mpnet-base-v2}
+    ports:
+      - "9100:9100"

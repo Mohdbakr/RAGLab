@@ -2005,6 +2005,7 @@ name = "raglab-common"
 version = "0.1.0"
 source = { editable = "../common" }
 dependencies = [
+    { name = "httpx" },
     { name = "litellm" },
     { name = "loguru" },
     { name = "pydantic" },
@@ -2012,6 +2013,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "httpx", specifier = ">=0.28" },
     { name = "litellm", specifier = ">=1.52" },
     { name = "loguru", specifier = ">=0.7.2" },
     { name = "pydantic", specifier = ">=2.9" },
