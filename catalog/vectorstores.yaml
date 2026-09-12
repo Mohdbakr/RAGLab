@@ -1,0 +1,18 @@
+# Registry of vector stores the unified launcher can start independently of
+# any one backend, for backends that declare them in `compatible_vector_stores`.
+#
+# Schema (per entry):
+#   id            Unique slug.
+#   name          Human-readable display name.
+#   compose_path  Path (from repo root) to a docker-compose file that stands up just this store.
+#   host          Hostname the store is reachable at once its compose stack is up.
+#   port          Primary client port.
+#   health_path   HTTP path (or "" for a TCP-only check) polled to decide "starting" vs "healthy".
+#   status        "planned" | "in_progress" | "shipped".
+#
+# None are wired up yet — Milvus keeps running as part of the
+# 02-document-qa-foundation project's own compose file until that project
+# is reviewed; the standalone, swappable stores below land with
+# 03-production-rag-reference (see the weekend roadmap in the root README).
+
+vectorstores: []

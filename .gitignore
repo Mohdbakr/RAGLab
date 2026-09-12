@@ -175,3 +175,7 @@ cython_debug/
 
 # docker compose volumes
 volumes/
+
+# RAGLab: per-project runtime output, never checked in
+logs/
+benchmarks/

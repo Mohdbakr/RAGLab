@@ -1,0 +1,37 @@
+[project]
+name = "raglab-frontend"
+version = "0.1.0"
+description = "Unified Streamlit launcher: pick a backend and vector store, spin them up on demand, and try them."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "streamlit>=1.41.1",
+    "pydantic-settings>=2.7.0",
+    "httpx>=0.28.1",
+    "raglab-common",
+]
+
+[tool.uv.sources]
+raglab-common = { path = "../common", editable = true }
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "pytest-cov>=6.0",
+    "ruff>=0.8",
+    "mypy>=1.13",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+
+[tool.pytest.ini_options]
+addopts = "--cov=raglab_frontend --cov-report=term-missing"

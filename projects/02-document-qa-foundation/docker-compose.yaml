@@ -72,9 +72,9 @@ services:
       - default
 
   backend:
-    build: ./RAGLab_BE
+    build: .
     env_file:
-      - ./RAGLab_BE/.env
+      - .env
     container_name: rag_lab_backend
     ports:
       - "8000:80"
@@ -84,40 +84,16 @@ services:
     volumes:
       - ${DOCKER_VOLUME_DIRECTORY:-.}/volumes/app:/app/api_data
 
-# for this to work use his command docker compose up --watch 
+# for this to work use his command docker compose up --watch
     develop:
       watch:
         - action: sync
-          path: ./RAGLab_BE
+          path: .
           target: /app
           ignore:
             - .venv/
         - action: rebuild
-          path: ./RAGLab_BE/pyproject.toml/
-
-  frontend:
-    build: ./RAGLab_FE
-    env_file:
-      - /RAGLab_FE/.env
-    container_name: rag_lab_frontend
-    command: streamlit run app.py --server.port 8501
-    depends_on:
-      - backend
-    volumes:
-      - ${DOCKER_VOLUME_DIRECTORY:-.}/volumes/RAGLab_FE:/app/frontend_files
-    ports:
-      - 8501:8501
-    networks:
-      - default
-    develop:
-      watch:
-        - action: sync
-          path: ./RAGLab_FE
-          target: /app
-          ignore:
-            - .venv/
-        - action: rebuild
-          path: ./RAGLab_FE/pyproject.toml/
+          path: ./pyproject.toml
 
 networks:
   default:
