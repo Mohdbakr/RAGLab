@@ -183,6 +183,24 @@ now — untouched until I've finished reviewing it myself.
 Each weekend milestone above is tracked as a GitHub issue (linked in the
 table) with its own acceptance checklist, closed as it ships.
 
+## Versioning & releases
+
+Tags follow CalVer: `vYYYY.0M.N` — year, zero-padded month, and a release
+counter that resets to 0 at the start of each month (e.g. `v2026.09.0`,
+then `v2026.09.1` for the next thing that ships the same month,
+`v2026.10.0` once October starts). I cut a tag and a
+[GitHub Release](https://github.com/Mohdbakr/RAGLab/releases) after each
+milestone lands — a new project, or a meaningful platform change — rather
+than on a fixed schedule.
+
+I'm using CalVer instead of SemVer on purpose: RAGLab isn't one library
+with an API compatibility contract to signal — it's a growing set of
+independent projects plus a shared platform, and what's actually useful to
+know is *when* something shipped, not whether it counts as a "breaking"
+change against some baseline. The month is zero-padded (`2026.09`, not
+`2026.9`) so tags still sort correctly as plain strings — bare CalVer
+without padding (`2026.9.0`) doesn't sort right once you hit `2026.10.0`.
+
 ## License
 
 CC BY-NC 4.0 — free to use for personal use and learning, attribution
