@@ -17,21 +17,29 @@ REPO_ROOT = Path("/repo")
 
 @dataclass
 class FakeRuntime:
-    """Records calls instead of touching Docker; `running` scripts is_running."""
+    """Records calls instead of touching Docker; `running` scripts is_running.
+
+    Each recorded call includes the project_name LifecycleService passed,
+    so tests can assert it's always the catalog spec's own id.
+    """
 
     running: bool = False
-    up_calls: list[tuple[Path, Mapping[str, str] | None]] = field(default_factory=list)
-    down_calls: list[tuple[Path, bool]] = field(default_factory=list)
+    up_calls: list[tuple[Path, str, Mapping[str, str] | None]] = field(default_factory=list)
+    down_calls: list[tuple[Path, str, bool]] = field(default_factory=list)
 
-    def up(self, compose_file: Path, env: Mapping[str, str] | None = None) -> None:
-        self.up_calls.append((compose_file, env))
+    def up(
+        self, compose_file: Path, project_name: str, env: Mapping[str, str] | None = None
+    ) -> None:
+        self.up_calls.append((compose_file, project_name, env))
         self.running = True
 
-    def down(self, compose_file: Path, *, remove_volumes: bool = False) -> None:
-        self.down_calls.append((compose_file, remove_volumes))
+    def down(
+        self, compose_file: Path, project_name: str, *, remove_volumes: bool = False
+    ) -> None:
+        self.down_calls.append((compose_file, project_name, remove_volumes))
         self.running = False
 
-    def is_running(self, compose_file: Path) -> bool:
+    def is_running(self, compose_file: Path, project_name: str) -> bool:
         return self.running
 
 
@@ -112,7 +120,8 @@ class TestBackendLifecycle:
 
         (call,) = runtime.up_calls
         assert call[0] == REPO_ROOT / "projects/03-production-rag-reference" / "docker-compose.yml"
-        assert call[1] == {"VECTOR_STORE_HOST": "chroma"}
+        assert call[1] == "03-production-rag-reference"
+        assert call[2] == {"VECTOR_STORE_HOST": "chroma"}
 
     def test_start_is_a_no_op_for_an_in_process_backend(self) -> None:
         runtime = FakeRuntime()
@@ -122,14 +131,15 @@ class TestBackendLifecycle:
 
         assert runtime.up_calls == []
 
-    def test_stop_calls_down_without_removing_volumes(self) -> None:
+    def test_stop_uses_the_backends_own_id_as_project_name(self) -> None:
         runtime = FakeRuntime(running=True)
         service = LifecycleService(runtime, FakeHealthChecker(), repo_root=REPO_ROOT)
 
         service.stop_backend(containerized_backend())
 
         (call,) = runtime.down_calls
-        assert call[1] is False
+        assert call[1] == "03-production-rag-reference"
+        assert call[2] is False
 
     def test_reset_tears_down_with_volumes_then_brings_back_up(self) -> None:
         runtime = FakeRuntime(running=True)
@@ -138,10 +148,18 @@ class TestBackendLifecycle:
         service.reset_backend(containerized_backend(), env={"X": "1"})
 
         assert runtime.down_calls == [
-            (REPO_ROOT / "projects/03-production-rag-reference" / "docker-compose.yml", True)
+            (
+                REPO_ROOT / "projects/03-production-rag-reference" / "docker-compose.yml",
+                "03-production-rag-reference",
+                True,
+            )
         ]
         assert runtime.up_calls == [
-            (REPO_ROOT / "projects/03-production-rag-reference" / "docker-compose.yml", {"X": "1"})
+            (
+                REPO_ROOT / "projects/03-production-rag-reference" / "docker-compose.yml",
+                "03-production-rag-reference",
+                {"X": "1"},
+            )
         ]
 
     @pytest.mark.asyncio
@@ -183,7 +201,7 @@ class TestBackendLifecycle:
 
 
 class TestVectorStoreLifecycle:
-    def test_start_resolves_compose_path_from_repo_root(self) -> None:
+    def test_start_resolves_compose_path_and_uses_its_own_id_as_project_name(self) -> None:
         runtime = FakeRuntime()
         service = LifecycleService(runtime, FakeHealthChecker(), repo_root=REPO_ROOT)
 
@@ -191,6 +209,7 @@ class TestVectorStoreLifecycle:
 
         (call,) = runtime.up_calls
         assert call[0] == REPO_ROOT / "platform/vectorstores/chroma/docker-compose.yml"
+        assert call[1] == "chroma"
 
     def test_reset_tears_down_with_volumes_then_brings_back_up(self) -> None:
         runtime = FakeRuntime(running=True)
@@ -198,7 +217,8 @@ class TestVectorStoreLifecycle:
 
         service.reset_vector_store(chroma_store())
 
-        assert runtime.down_calls[0][1] is True
+        assert runtime.down_calls[0][1] == "chroma"
+        assert runtime.down_calls[0][2] is True
         assert len(runtime.up_calls) == 1
 
     @pytest.mark.asyncio
@@ -236,7 +256,7 @@ class TestVectorStoreLifecycle:
 
 
 class TestEmbeddingServiceLifecycle:
-    def test_start_resolves_compose_path_from_repo_root(self) -> None:
+    def test_start_resolves_compose_path_and_uses_its_own_id_as_project_name(self) -> None:
         runtime = FakeRuntime()
         service = LifecycleService(runtime, FakeHealthChecker(), repo_root=REPO_ROOT)
 
@@ -244,6 +264,7 @@ class TestEmbeddingServiceLifecycle:
 
         (call,) = runtime.up_calls
         assert call[0] == REPO_ROOT / "projects/00-embedding-service/docker-compose.yml"
+        assert call[1] == "00-embedding-service"
 
     def test_reset_tears_down_with_volumes_then_brings_back_up(self) -> None:
         runtime = FakeRuntime(running=True)
@@ -251,7 +272,8 @@ class TestEmbeddingServiceLifecycle:
 
         service.reset_embedding_service(embedding_service())
 
-        assert runtime.down_calls[0][1] is True
+        assert runtime.down_calls[0][1] == "00-embedding-service"
+        assert runtime.down_calls[0][2] is True
         assert len(runtime.up_calls) == 1
 
     @pytest.mark.asyncio

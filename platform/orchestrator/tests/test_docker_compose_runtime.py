@@ -49,12 +49,14 @@ class TestUp:
         runner = FakeRunner()
         runtime = DockerComposeRuntime(runner=runner)
 
-        runtime.up(compose_file)
+        runtime.up(compose_file, "test-project")
 
         (call,) = runner.calls
         assert call["command"] == [
             "docker",
             "compose",
+            "-p",
+            "test-project",
             "-f",
             str(compose_file),
             "up",
@@ -69,7 +71,7 @@ class TestUp:
         runner = FakeRunner()
         runtime = DockerComposeRuntime(runner=runner)
 
-        runtime.up(compose_file, env={"VECTOR_STORE_HOST": "chroma"})
+        runtime.up(compose_file, "test-project", env={"VECTOR_STORE_HOST": "chroma"})
 
         (call,) = runner.calls
         assert call["env"]["VECTOR_STORE_HOST"] == "chroma"
@@ -80,7 +82,7 @@ class TestUp:
         runtime = DockerComposeRuntime(runner=runner)
 
         with pytest.raises(DockerComposeCommandError, match="boom"):
-            runtime.up(compose_file)
+            runtime.up(compose_file, "test-project")
 
 
 class TestDown:
@@ -88,7 +90,7 @@ class TestDown:
         runner = FakeRunner()
         runtime = DockerComposeRuntime(runner=runner)
 
-        runtime.down(compose_file)
+        runtime.down(compose_file, "test-project")
 
         (call,) = runner.calls
         assert "-v" not in call["command"]
@@ -97,7 +99,7 @@ class TestDown:
         runner = FakeRunner()
         runtime = DockerComposeRuntime(runner=runner)
 
-        runtime.down(compose_file, remove_volumes=True)
+        runtime.down(compose_file, "test-project", remove_volumes=True)
 
         (call,) = runner.calls
         assert call["command"][-1] == "-v"
@@ -107,24 +109,44 @@ class TestDown:
         runtime = DockerComposeRuntime(runner=runner)
 
         with pytest.raises(DockerComposeCommandError, match="down failed"):
-            runtime.down(compose_file)
+            runtime.down(compose_file, "test-project")
 
 
 class TestIsRunning:
+    def test_passes_the_explicit_project_name(self, compose_file: Path) -> None:
+        runner = FakeRunner(returncode=0, stdout="backend\n")
+        runtime = DockerComposeRuntime(runner=runner)
+
+        runtime.is_running(compose_file, "test-project")
+
+        (call,) = runner.calls
+        assert call["command"] == [
+            "docker",
+            "compose",
+            "-p",
+            "test-project",
+            "-f",
+            str(compose_file),
+            "ps",
+            "--status",
+            "running",
+            "--services",
+        ]
+
     def test_true_when_ps_lists_at_least_one_service(self, compose_file: Path) -> None:
         runner = FakeRunner(returncode=0, stdout="backend\n")
         runtime = DockerComposeRuntime(runner=runner)
 
-        assert runtime.is_running(compose_file) is True
+        assert runtime.is_running(compose_file, "test-project") is True
 
     def test_false_when_ps_lists_no_services(self, compose_file: Path) -> None:
         runner = FakeRunner(returncode=0, stdout="")
         runtime = DockerComposeRuntime(runner=runner)
 
-        assert runtime.is_running(compose_file) is False
+        assert runtime.is_running(compose_file, "test-project") is False
 
     def test_false_on_nonzero_exit_rather_than_raising(self, compose_file: Path) -> None:
         runner = FakeRunner(returncode=1, stderr="no such project")
         runtime = DockerComposeRuntime(runner=runner)
 
-        assert runtime.is_running(compose_file) is False
+        assert runtime.is_running(compose_file, "test-project") is False

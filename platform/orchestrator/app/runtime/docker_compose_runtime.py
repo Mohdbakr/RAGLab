@@ -48,28 +48,34 @@ class DockerComposeRuntime:
         """
         self._runner = runner
 
-    def up(self, compose_file: Path, env: Mapping[str, str] | None = None) -> None:
+    def up(
+        self, compose_file: Path, project_name: str, env: Mapping[str, str] | None = None
+    ) -> None:
         """See :meth:`app.runtime.protocol.ContainerRuntime.up`."""
         merged_env = {**os.environ, **env} if env else None
         self._run(
-            ["docker", "compose", "-f", str(compose_file), "up", "-d"],
+            ["docker", "compose", "-p", project_name, "-f", str(compose_file), "up", "-d"],
             compose_file,
             env=merged_env,
         )
 
-    def down(self, compose_file: Path, *, remove_volumes: bool = False) -> None:
+    def down(
+        self, compose_file: Path, project_name: str, *, remove_volumes: bool = False
+    ) -> None:
         """See :meth:`app.runtime.protocol.ContainerRuntime.down`."""
-        command = ["docker", "compose", "-f", str(compose_file), "down"]
+        command = ["docker", "compose", "-p", project_name, "-f", str(compose_file), "down"]
         if remove_volumes:
             command.append("-v")
         self._run(command, compose_file, env=None)
 
-    def is_running(self, compose_file: Path) -> bool:
+    def is_running(self, compose_file: Path, project_name: str) -> bool:
         """See :meth:`app.runtime.protocol.ContainerRuntime.is_running`."""
         result = self._runner(
             [
                 "docker",
                 "compose",
+                "-p",
+                project_name,
                 "-f",
                 str(compose_file),
                 "ps",

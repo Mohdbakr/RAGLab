@@ -49,20 +49,28 @@ class LifecycleService:
     def _embedding_service_compose_path(self, spec: EmbeddingServiceSpec) -> Path:
         return self._repo_root / spec.compose_path
 
-    # -- generic start/stop/reset/status, shared by both catalog kinds --
+    # -- generic start/stop/reset/status, shared by every catalog kind --
+    #
+    # project_name is always the catalog spec's own id, passed explicitly
+    # as Compose's `-p` rather than trusting each compose file's own
+    # `name:` key — two files can otherwise declare (or default to) the
+    # same project name and get treated as one Compose project, so
+    # starting/stopping/checking one leaks into the other's containers.
 
-    def _start(self, compose_path: Path, env: Mapping[str, str] | None) -> None:
-        self._runtime.up(compose_path, env=env)
+    def _start(self, compose_path: Path, project_name: str, env: Mapping[str, str] | None) -> None:
+        self._runtime.up(compose_path, project_name, env=env)
 
-    def _stop(self, compose_path: Path) -> None:
-        self._runtime.down(compose_path)
+    def _stop(self, compose_path: Path, project_name: str) -> None:
+        self._runtime.down(compose_path, project_name)
 
-    def _reset(self, compose_path: Path, env: Mapping[str, str] | None) -> None:
-        self._runtime.down(compose_path, remove_volumes=True)
-        self._runtime.up(compose_path, env=env)
+    def _reset(self, compose_path: Path, project_name: str, env: Mapping[str, str] | None) -> None:
+        self._runtime.down(compose_path, project_name, remove_volumes=True)
+        self._runtime.up(compose_path, project_name, env=env)
 
-    async def _status(self, compose_path: Path, health_url: str | None) -> ComponentState:
-        if not self._runtime.is_running(compose_path):
+    async def _status(
+        self, compose_path: Path, project_name: str, health_url: str | None
+    ) -> ComponentState:
+        if not self._runtime.is_running(compose_path, project_name):
             return ComponentState.STOPPED
         if health_url is None:
             return ComponentState.HEALTHY
@@ -81,7 +89,7 @@ class LifecycleService:
         """
         if not spec.needs_container:
             return
-        self._start(self._backend_compose_path(spec), env)
+        self._start(self._backend_compose_path(spec), spec.id, env)
 
     def stop_backend(self, spec: BackendSpec) -> None:
         """Stop a backend's stack, unless it runs in-process.
@@ -91,7 +99,7 @@ class LifecycleService:
         """
         if not spec.needs_container:
             return
-        self._stop(self._backend_compose_path(spec))
+        self._stop(self._backend_compose_path(spec), spec.id)
 
     def reset_backend(self, spec: BackendSpec, env: Mapping[str, str] | None = None) -> None:
         """Wipe a backend's persisted state and bring it back up clean.
@@ -102,7 +110,7 @@ class LifecycleService:
         """
         if not spec.needs_container:
             return
-        self._reset(self._backend_compose_path(spec), env)
+        self._reset(self._backend_compose_path(spec), spec.id, env)
 
     async def get_backend_status(self, spec: BackendSpec) -> ComponentState:
         """Report a backend's current lifecycle state.
@@ -118,7 +126,7 @@ class LifecycleService:
         if not spec.needs_container:
             return ComponentState.HEALTHY
         health_url = spec.base_url + spec.health_path
-        return await self._status(self._backend_compose_path(spec), health_url)
+        return await self._status(self._backend_compose_path(spec), spec.id, health_url)
 
     # -- vector stores -------------------------------------------------
 
@@ -128,7 +136,7 @@ class LifecycleService:
         Args:
             spec: The vector store to start.
         """
-        self._start(self._vector_store_compose_path(spec), None)
+        self._start(self._vector_store_compose_path(spec), spec.id, None)
 
     def stop_vector_store(self, spec: VectorStoreSpec) -> None:
         """Stop a vector store's stack.
@@ -136,7 +144,7 @@ class LifecycleService:
         Args:
             spec: The vector store to stop.
         """
-        self._stop(self._vector_store_compose_path(spec))
+        self._stop(self._vector_store_compose_path(spec), spec.id)
 
     def reset_vector_store(self, spec: VectorStoreSpec) -> None:
         """Wipe a vector store's data and bring it back up clean.
@@ -144,7 +152,7 @@ class LifecycleService:
         Args:
             spec: The vector store to reset.
         """
-        self._reset(self._vector_store_compose_path(spec), None)
+        self._reset(self._vector_store_compose_path(spec), spec.id, None)
 
     async def get_vector_store_status(self, spec: VectorStoreSpec) -> ComponentState:
         """Report a vector store's current lifecycle state.
@@ -160,7 +168,7 @@ class LifecycleService:
         health_url = (
             f"http://{spec.host}:{spec.port}{spec.health_path}" if spec.health_path else None
         )
-        return await self._status(self._vector_store_compose_path(spec), health_url)
+        return await self._status(self._vector_store_compose_path(spec), spec.id, health_url)
 
     # -- embedding services ----------------------------------------------
 
@@ -170,7 +178,7 @@ class LifecycleService:
         Args:
             spec: The embedding service to start.
         """
-        self._start(self._embedding_service_compose_path(spec), None)
+        self._start(self._embedding_service_compose_path(spec), spec.id, None)
 
     def stop_embedding_service(self, spec: EmbeddingServiceSpec) -> None:
         """Stop an embedding service's stack.
@@ -178,7 +186,7 @@ class LifecycleService:
         Args:
             spec: The embedding service to stop.
         """
-        self._stop(self._embedding_service_compose_path(spec))
+        self._stop(self._embedding_service_compose_path(spec), spec.id)
 
     def reset_embedding_service(self, spec: EmbeddingServiceSpec) -> None:
         """Wipe an embedding service's data and bring it back up clean.
@@ -186,7 +194,7 @@ class LifecycleService:
         Args:
             spec: The embedding service to reset.
         """
-        self._reset(self._embedding_service_compose_path(spec), None)
+        self._reset(self._embedding_service_compose_path(spec), spec.id, None)
 
     async def get_embedding_service_status(self, spec: EmbeddingServiceSpec) -> ComponentState:
         """Report an embedding service's current lifecycle state.
@@ -202,4 +210,6 @@ class LifecycleService:
         health_url = (
             f"http://{spec.host}:{spec.port}{spec.health_path}" if spec.health_path else None
         )
-        return await self._status(self._embedding_service_compose_path(spec), health_url)
+        return await self._status(
+            self._embedding_service_compose_path(spec), spec.id, health_url
+        )
