@@ -33,7 +33,9 @@ Two decisions were made up front (via AskUserQuestion):
 A follow-up round shaped the concrete layout: cross-cutting concerns
 (config, exceptions, logging) get their own package rather than
 sitting loose next to `cli.py`, and `logging_setup.py` becomes
-`logging.py`.
+`logging.py`. A second follow-up asked for the logger itself to gain
+separate console/file formatters and a startup banner — folded into
+the `core/logging.py` section below.
 
 ## Package layout
 
@@ -99,10 +101,16 @@ class Settings(BaseSettings):
     retrieval_k: int = 4
     index_path: Path = Path(".plainrag_index.json")
     log_level: str = "INFO"
+    log_file: Path | None = None
 
 @lru_cache
 def get_settings() -> Settings: ...
 ```
+
+`log_file` defaults to `None` (console-only) — this stays a project
+you can `uv run plainrag ...` without it quietly leaving files behind.
+Setting `PLAINRAG_LOG_FILE=logs/plainrag.log` (or the `.env` equivalent)
+turns file logging on.
 
 No API-key field. `litellm` already reads `OPENAI_API_KEY` (or
 whichever provider's key) directly from the environment and auto-loads
@@ -142,14 +150,66 @@ talking to the network or disk:
 
 ## `core/logging.py`
 
-Renamed from `logging_setup.py`, same content, plus reading
-`log_level` from `Settings` instead of a hardcoded `"INFO"`:
+Renamed from `logging_setup.py`. Two additions beyond the rename:
+separate console/file formatters, and a one-time startup banner.
 
 ```python
-def get_logger(level: str = "INFO") -> Logger: ...
+_CONSOLE_FORMAT = "<green>{time:HH:mm:ss}</green> | <level>{level: <8}</level> | {message}"
+_FILE_FORMAT = (
+    "{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} | {message}"
+)
+
+def get_logger(*, level: str = "INFO", log_file: Path | None = None) -> Logger:
+    """Configure (once) console + optional file sinks and return the logger."""
+    ...
+    _logger.add(sys.stderr, level=level, format=_CONSOLE_FORMAT)
+    if log_file is not None:
+        _logger.add(
+            log_file, level=level, format=_FILE_FORMAT, rotation="10 MB", retention="7 days"
+        )
+    return _logger
+
+
+def print_banner(version: str) -> None:
+    """Print a one-time startup banner to the console (not logged)."""
+    console = Console()
+    console.print(
+        Panel.fit(
+            f"[bold cyan]plainrag[/] [dim]v{version}[/]\n"
+            "[dim]RAG from scratch — no framework, no vector-DB service[/]",
+            border_style="cyan",
+        )
+    )
 ```
 
-`cli.py` calls `get_logger(get_settings().log_level)`.
+The console sink stays terse and colored for interactive use; the file
+sink (only added when `log_file` is set) is plain text with a
+timestamp and `module:function:line`, meant for grepping later rather
+than reading live. `rotation`/`retention` are loguru built-ins — no new
+dependency for log management.
+
+The banner uses `rich` (`Panel`, `Console`) — already an effective
+dependency today via `typer`'s own use of it for help rendering, so
+this makes an existing transitive dependency explicit in
+`pyproject.toml` rather than adding a new one. `version` comes from
+`importlib.metadata.version("plainrag")`, exposed as
+`plainrag.__version__` in `src/plainrag/__init__.py`, so the version
+string isn't duplicated between `pyproject.toml` and application code.
+
+`cli.py` wires it up in an `@app.callback()`, which Typer runs once
+before whichever subcommand was invoked — but not for `--help` (Click
+resolves eager options like `--help` before the callback body runs),
+so the banner shows on real usage, not on `plainrag --help`:
+
+```python
+_settings = get_settings()
+log = get_logger(level=_settings.log_level, log_file=_settings.log_file)
+
+@app.callback()
+def main() -> None:
+    """RAG from scratch: chunk, embed, retrieve, and answer — no framework."""
+    print_banner(__version__)
+```
 
 ## Error handling at the CLI boundary
 
@@ -177,7 +237,7 @@ tests/
   test_config.py            # new
   core/
     __init__.py
-    test_logging.py          # new (trivial: configures once, returns logger)
+    test_logging.py          # new: console/file sinks configured, banner prints once
   domain/
     __init__.py
     test_chunking.py
@@ -212,7 +272,8 @@ The chunking algorithm, cosine-similarity math, prompt assembly, and
 direct `litellm` calls are untouched — this is a reorganization and
 hardening pass, not a rewrite. `Dockerfile`/`docker-compose.yml`/
 `Makefile` need no changes (they already operate on `src/` and
-`tests/` recursively). `pyproject.toml` needs one addition
-(`pydantic-settings` as a direct dependency) and no changes to
+`tests/` recursively). `pyproject.toml` needs two additions
+(`pydantic-settings` and `rich` as direct dependencies — both already
+installed transitively today) and no changes to
 `[tool.hatch.build.targets.wheel]` (hatchling packages `src/plainrag`
 recursively already).
