@@ -11,13 +11,14 @@ It's fully standalone: no dependency on anything else in this repo.
 ## What it does
 
 1. **`ingest`** — read a text file, split it into overlapping word-window
-   chunks (`ragscratch/chunking.py`), embed each chunk (`ragscratch/embeddings.py`,
-   via `litellm` — any embedding provider it supports works), and save the
-   result to a small on-disk index (`ragscratch/index.py`: a NumPy array of
-   vectors plus their source text, no vector-database server involved).
+   chunks (`src/plainrag/chunking.py`), embed each chunk
+   (`src/plainrag/embeddings.py`, via `litellm` — any embedding provider it
+   supports works), and save the result to a small on-disk index
+   (`src/plainrag/index.py`: a NumPy array of vectors plus their source
+   text, no vector-database server involved).
 2. **`ask`** — embed the question the same way, retrieve the top-k most
    similar chunks by cosine similarity, assemble them into a prompt with
-   citations, and ask an LLM (`ragscratch/llm.py`, also via `litellm`) to
+   citations, and ask an LLM (`src/plainrag/llm.py`, also via `litellm`) to
    answer strictly from that context.
 
 ## Run it
@@ -26,12 +27,12 @@ It's fully standalone: no dependency on anything else in this repo.
 uv sync
 export OPENAI_API_KEY=...   # or point at any litellm-supported provider
 
-uv run ragscratch ingest path/to/some.txt
-uv run ragscratch ask "What does the document say about X?"
+uv run plainrag ingest path/to/some.txt
+uv run plainrag ask "What does the document say about X?"
 ```
 
 No Docker, no separate service — the index is just a file on disk
-(`.ragscratch_index.json` by default).
+(`.plainrag_index.json` by default).
 
 ## Why build this "the hard way"
 

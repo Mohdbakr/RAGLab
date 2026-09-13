@@ -1,4 +1,4 @@
-"""Tests for ragscratch.embeddings, written before the implementation.
+"""Tests for plainrag.embeddings, written before the implementation.
 
 litellm itself is never called — `litellm.aembedding` is monkeypatched.
 """
@@ -10,7 +10,7 @@ from typing import Any
 
 import pytest
 
-from ragscratch.embeddings import embed_texts
+from plainrag.embeddings import embed_texts
 
 
 @dataclass
@@ -39,7 +39,7 @@ class TestEmbedTexts:
                 ]
             )
 
-        monkeypatch.setattr("ragscratch.embeddings.litellm.aembedding", fake_aembedding)
+        monkeypatch.setattr("plainrag.embeddings.litellm.aembedding", fake_aembedding)
 
         vectors = await embed_texts(["hello", "world"], model="text-embedding-3-small")
 
@@ -54,6 +54,6 @@ class TestEmbedTexts:
         async def fake_aembedding(**kwargs: Any) -> FakeEmbeddingResponse:
             raise AssertionError("should not be called for empty input")
 
-        monkeypatch.setattr("ragscratch.embeddings.litellm.aembedding", fake_aembedding)
+        monkeypatch.setattr("plainrag.embeddings.litellm.aembedding", fake_aembedding)
 
         assert await embed_texts([]) == []

@@ -9,10 +9,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from ragscratch.chunking import chunk_text
-from ragscratch.embeddings import embed_texts
-from ragscratch.index import CosineSimilarityIndex, DocumentChunk, ScoredChunk
-from ragscratch.llm import answer_question
+from plainrag.chunking import chunk_text
+from plainrag.embeddings import embed_texts
+from plainrag.index import CosineSimilarityIndex, DocumentChunk, ScoredChunk
+from plainrag.llm import answer_question
 
 
 @dataclass
@@ -45,7 +45,7 @@ async def ingest_text(
         text: The document's raw text.
         source: A label for where it came from (e.g. a file path),
             attached to every chunk for later citation.
-        chunk_size: Words per chunk, see :func:`ragscratch.chunking.chunk_text`.
+        chunk_size: Words per chunk, see :func:`plainrag.chunking.chunk_text`.
         overlap: Words shared between consecutive chunks.
         embedding_model: Any litellm-supported embedding model string.
 

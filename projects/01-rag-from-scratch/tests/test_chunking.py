@@ -1,10 +1,10 @@
-"""Tests for ragscratch.chunking, written before the implementation."""
+"""Tests for plainrag.chunking, written before the implementation."""
 
 from __future__ import annotations
 
 import pytest
 
-from ragscratch.chunking import chunk_text
+from plainrag.chunking import chunk_text
 
 
 class TestChunkText:

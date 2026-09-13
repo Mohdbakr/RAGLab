@@ -1,6 +1,6 @@
-"""Tests for ragscratch.cli, written before the implementation.
+"""Tests for plainrag.cli, written before the implementation.
 
-The underlying rag functions are monkeypatched at the ragscratch.cli
+The underlying rag functions are monkeypatched at the plainrag.cli
 module namespace (where cli.py imports them), so no litellm call happens
 and these stay fast/offline.
 """
@@ -13,8 +13,8 @@ from typing import Any
 import pytest
 from typer.testing import CliRunner
 
-from ragscratch.index import CosineSimilarityIndex, DocumentChunk, ScoredChunk
-from ragscratch.rag import AnswerResult
+from plainrag.index import CosineSimilarityIndex, DocumentChunk, ScoredChunk
+from plainrag.rag import AnswerResult
 
 runner = CliRunner()
 
@@ -29,7 +29,7 @@ class TestIngestCommand:
     def test_reads_the_file_and_reports_how_many_chunks_were_added(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        from ragscratch import cli
+        from plainrag import cli
 
         source_file = tmp_path / "doc.txt"
         source_file.write_text("some content")
@@ -55,7 +55,7 @@ class TestIngestCommand:
     def test_saves_the_index_after_ingesting(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        from ragscratch import cli
+        from plainrag import cli
 
         source_file = tmp_path / "doc.txt"
         source_file.write_text("some content")
@@ -80,7 +80,7 @@ class TestIngestCommand:
 
 class TestAskCommand:
     def test_exits_with_an_error_when_the_index_is_empty(self, tmp_path: Path) -> None:
-        from ragscratch import cli
+        from plainrag import cli
 
         result = runner.invoke(
             cli.app, ["ask", "anything?", "--index-path", str(tmp_path / "missing.json")]
@@ -91,7 +91,7 @@ class TestAskCommand:
     def test_prints_the_answer_and_its_sources(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        from ragscratch import cli
+        from plainrag import cli
 
         index_path = tmp_path / "index.json"
         index = CosineSimilarityIndex()

@@ -1,4 +1,4 @@
-"""Tests for ragscratch.index, written before the implementation."""
+"""Tests for plainrag.index, written before the implementation."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from ragscratch.index import CosineSimilarityIndex, DocumentChunk
+from plainrag.index import CosineSimilarityIndex, DocumentChunk
 
 
 def chunk(text: str, embedding: list[float], source: str = "doc.txt") -> DocumentChunk:

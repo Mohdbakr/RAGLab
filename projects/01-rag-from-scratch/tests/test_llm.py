@@ -1,4 +1,4 @@
-"""Tests for ragscratch.llm, written before the implementation."""
+"""Tests for plainrag.llm, written before the implementation."""
 
 from __future__ import annotations
 
@@ -7,8 +7,8 @@ from typing import Any
 
 import pytest
 
-from ragscratch.index import DocumentChunk, ScoredChunk
-from ragscratch.llm import answer_question, build_context_block, build_messages
+from plainrag.index import DocumentChunk, ScoredChunk
+from plainrag.llm import answer_question, build_context_block, build_messages
 
 
 def scored(text: str, source: str, score: float) -> ScoredChunk:
@@ -76,7 +76,7 @@ class TestAnswerQuestion:
             captured.update(kwargs)
             return FakeCompletionResponse(choices=[FakeChoice(message=FakeMessage(content="42"))])
 
-        monkeypatch.setattr("ragscratch.llm.litellm.acompletion", fake_acompletion)
+        monkeypatch.setattr("plainrag.llm.litellm.acompletion", fake_acompletion)
 
         answer = await answer_question(
             "What is the answer?",
@@ -94,7 +94,7 @@ class TestAnswerQuestion:
         async def fake_acompletion(**kwargs: Any) -> FakeCompletionResponse:
             return FakeCompletionResponse(choices=[FakeChoice(message=FakeMessage(content=None))])
 
-        monkeypatch.setattr("ragscratch.llm.litellm.acompletion", fake_acompletion)
+        monkeypatch.setattr("plainrag.llm.litellm.acompletion", fake_acompletion)
 
         answer = await answer_question("Q?", [])
 

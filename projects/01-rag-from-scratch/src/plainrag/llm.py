@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import litellm
 
-from ragscratch.index import ScoredChunk
+from plainrag.index import ScoredChunk
 
 _SYSTEM_PROMPT = (
     "You are a precise research assistant. Answer the question using ONLY "

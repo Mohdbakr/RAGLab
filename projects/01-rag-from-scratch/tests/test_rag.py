@@ -1,6 +1,6 @@
-"""Tests for ragscratch.rag, written before the implementation.
+"""Tests for plainrag.rag, written before the implementation.
 
-embed_texts and answer_question are monkeypatched at the ragscratch.rag
+embed_texts and answer_question are monkeypatched at the plainrag.rag
 module namespace (where rag.py imports them), so no litellm call happens.
 """
 
@@ -10,8 +10,8 @@ from typing import Any
 
 import pytest
 
-from ragscratch.index import CosineSimilarityIndex, DocumentChunk, ScoredChunk
-from ragscratch.rag import AnswerResult, ask, ingest_text
+from plainrag.index import CosineSimilarityIndex, DocumentChunk, ScoredChunk
+from plainrag.rag import AnswerResult, ask, ingest_text
 
 
 class TestIngestText:
@@ -20,7 +20,7 @@ class TestIngestText:
         async def fake_embed_texts(texts: list[str], **kwargs: Any) -> list[list[float]]:
             raise AssertionError("should not embed when there's nothing to chunk")
 
-        monkeypatch.setattr("ragscratch.rag.embed_texts", fake_embed_texts)
+        monkeypatch.setattr("plainrag.rag.embed_texts", fake_embed_texts)
         index = CosineSimilarityIndex()
 
         added = await ingest_text(index, "", source="empty.txt")
@@ -39,7 +39,7 @@ class TestIngestText:
             captured["kwargs"] = kwargs
             return [[float(i), 0.0] for i in range(len(texts))]
 
-        monkeypatch.setattr("ragscratch.rag.embed_texts", fake_embed_texts)
+        monkeypatch.setattr("plainrag.rag.embed_texts", fake_embed_texts)
         index = CosineSimilarityIndex()
 
         added = await ingest_text(
@@ -71,8 +71,8 @@ class TestAsk:
             answer_calls["chunks"] = chunks
             return "the answer"
 
-        monkeypatch.setattr("ragscratch.rag.embed_texts", fake_embed_texts)
-        monkeypatch.setattr("ragscratch.rag.answer_question", fake_answer_question)
+        monkeypatch.setattr("plainrag.rag.embed_texts", fake_embed_texts)
+        monkeypatch.setattr("plainrag.rag.answer_question", fake_answer_question)
 
         index = CosineSimilarityIndex()
         # Seed the index directly with a known vector, bypassing ingest.
@@ -98,8 +98,8 @@ class TestAsk:
         ) -> str:
             return "I don't know."
 
-        monkeypatch.setattr("ragscratch.rag.embed_texts", fake_embed_texts)
-        monkeypatch.setattr("ragscratch.rag.answer_question", fake_answer_question)
+        monkeypatch.setattr("plainrag.rag.embed_texts", fake_embed_texts)
+        monkeypatch.setattr("plainrag.rag.answer_question", fake_answer_question)
 
         result = await ask(CosineSimilarityIndex(), "Anything?")
 
