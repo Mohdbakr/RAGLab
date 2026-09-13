@@ -7,26 +7,12 @@ needed to see the shape of the flow.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-
-from plainrag.chunking import chunk_text
-from plainrag.embeddings import embed_texts
-from plainrag.index import CosineSimilarityIndex, DocumentChunk, ScoredChunk
-from plainrag.llm import answer_question
-
-
-@dataclass
-class AnswerResult:
-    """An answer paired with the chunks it was grounded in.
-
-    Attributes:
-        answer: The generated answer text.
-        sources: The retrieved chunks used to ground it, most relevant
-            first — empty if the index had nothing to retrieve.
-    """
-
-    answer: str
-    sources: list[ScoredChunk]
+from plainrag.core.exceptions import EmptyIndexError
+from plainrag.domain.chunking import chunk_text
+from plainrag.domain.models import AnswerResult, DocumentChunk
+from plainrag.services.embeddings import embed_texts
+from plainrag.services.index import CosineSimilarityIndex
+from plainrag.services.llm import answer_question
 
 
 async def ingest_text(
@@ -45,7 +31,7 @@ async def ingest_text(
         text: The document's raw text.
         source: A label for where it came from (e.g. a file path),
             attached to every chunk for later citation.
-        chunk_size: Words per chunk, see :func:`plainrag.chunking.chunk_text`.
+        chunk_size: Words per chunk, see :func:`plainrag.domain.chunking.chunk_text`.
         overlap: Words shared between consecutive chunks.
         embedding_model: Any litellm-supported embedding model string.
 
@@ -84,7 +70,12 @@ async def ask(
 
     Returns:
         The answer and the chunks it was grounded in.
+
+    Raises:
+        EmptyIndexError: If the index has nothing in it yet.
     """
+    if len(index) == 0:
+        raise EmptyIndexError("The index is empty — ingest something before asking.")
     (query_vector,) = await embed_texts([question], model=embedding_model)
     sources = index.search(query_vector, k=k)
     answer = await answer_question(question, sources, model=chat_model)

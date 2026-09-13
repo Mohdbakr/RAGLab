@@ -10,8 +10,10 @@ from typing import Any
 
 import pytest
 
-from plainrag.index import CosineSimilarityIndex, DocumentChunk, ScoredChunk
-from plainrag.rag import AnswerResult, ask, ingest_text
+from plainrag.core.exceptions import EmptyIndexError
+from plainrag.domain.models import AnswerResult, DocumentChunk, ScoredChunk
+from plainrag.services.index import CosineSimilarityIndex
+from plainrag.services.rag import ask, ingest_text
 
 
 class TestIngestText:
@@ -20,7 +22,7 @@ class TestIngestText:
         async def fake_embed_texts(texts: list[str], **kwargs: Any) -> list[list[float]]:
             raise AssertionError("should not embed when there's nothing to chunk")
 
-        monkeypatch.setattr("plainrag.rag.embed_texts", fake_embed_texts)
+        monkeypatch.setattr("plainrag.services.rag.embed_texts", fake_embed_texts)
         index = CosineSimilarityIndex()
 
         added = await ingest_text(index, "", source="empty.txt")
@@ -39,7 +41,7 @@ class TestIngestText:
             captured["kwargs"] = kwargs
             return [[float(i), 0.0] for i in range(len(texts))]
 
-        monkeypatch.setattr("plainrag.rag.embed_texts", fake_embed_texts)
+        monkeypatch.setattr("plainrag.services.rag.embed_texts", fake_embed_texts)
         index = CosineSimilarityIndex()
 
         added = await ingest_text(
@@ -71,8 +73,8 @@ class TestAsk:
             answer_calls["chunks"] = chunks
             return "the answer"
 
-        monkeypatch.setattr("plainrag.rag.embed_texts", fake_embed_texts)
-        monkeypatch.setattr("plainrag.rag.answer_question", fake_answer_question)
+        monkeypatch.setattr("plainrag.services.rag.embed_texts", fake_embed_texts)
+        monkeypatch.setattr("plainrag.services.rag.answer_question", fake_answer_question)
 
         index = CosineSimilarityIndex()
         # Seed the index directly with a known vector, bypassing ingest.
@@ -87,21 +89,19 @@ class TestAsk:
         assert answer_calls["question"] == "What is the seed fact?"
 
     @pytest.mark.asyncio
-    async def test_returns_no_sources_when_the_index_is_empty(
+    async def test_raises_empty_index_error_without_calling_any_provider(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        async def fake_embed_texts(texts: list[str], **kwargs: Any) -> list[list[float]]:
-            return [[1.0, 0.0]]
+        async def unexpected_embed_texts(texts: list[str], **kwargs: Any) -> list[list[float]]:
+            raise AssertionError("should not embed against an empty index")
 
-        async def fake_answer_question(
+        async def unexpected_answer_question(
             question: str, chunks: list[ScoredChunk], **kwargs: Any
         ) -> str:
-            return "I don't know."
+            raise AssertionError("should not generate against an empty index")
 
-        monkeypatch.setattr("plainrag.rag.embed_texts", fake_embed_texts)
-        monkeypatch.setattr("plainrag.rag.answer_question", fake_answer_question)
+        monkeypatch.setattr("plainrag.services.rag.embed_texts", unexpected_embed_texts)
+        monkeypatch.setattr("plainrag.services.rag.answer_question", unexpected_answer_question)
 
-        result = await ask(CosineSimilarityIndex(), "Anything?")
-
-        assert result.sources == []
-        assert result.answer == "I don't know."
+        with pytest.raises(EmptyIndexError):
+            await ask(CosineSimilarityIndex(), "Anything?")
