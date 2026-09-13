@@ -12,9 +12,7 @@ from plainrag.logging_setup import get_logger
 from plainrag.rag import ask as ask_question
 from plainrag.rag import ingest_text
 
-app = typer.Typer(
-    help="RAG from scratch: chunk, embed, retrieve, and answer — no framework."
-)
+app = typer.Typer(help="RAG from scratch: chunk, embed, retrieve, and answer — no framework.")
 log = get_logger()
 
 _DEFAULT_INDEX_PATH = Path(".plainrag_index.json")
@@ -23,9 +21,7 @@ _DEFAULT_INDEX_PATH = Path(".plainrag_index.json")
 @app.command()
 def ingest(
     path: Path = typer.Argument(..., help="Path to a text file to ingest."),
-    index_path: Path = typer.Option(
-        _DEFAULT_INDEX_PATH, help="Where to store the index."
-    ),
+    index_path: Path = typer.Option(_DEFAULT_INDEX_PATH, help="Where to store the index."),
     chunk_size: int = typer.Option(200, help="Words per chunk."),
     overlap: int = typer.Option(20, help="Words shared between consecutive chunks."),
     embedding_model: str = typer.Option(
@@ -57,21 +53,15 @@ def ask(
     embedding_model: str = typer.Option(
         "text-embedding-3-small", help="Any litellm-supported embedding model."
     ),
-    chat_model: str = typer.Option(
-        "gpt-4o-mini", help="Any litellm-supported chat model."
-    ),
+    chat_model: str = typer.Option("gpt-4o-mini", help="Any litellm-supported chat model."),
 ) -> None:
     """Answer a question, grounded in whatever's been ingested."""
     index = CosineSimilarityIndex.load(index_path)
     if len(index) == 0:
-        log.warning(
-            "The index at {} is empty — run `plainrag ingest` first.", index_path
-        )
+        log.warning("The index at {} is empty — run `plainrag ingest` first.", index_path)
         raise typer.Exit(code=1)
     result = asyncio.run(
-        ask_question(
-            index, question, k=k, embedding_model=embedding_model, chat_model=chat_model
-        )
+        ask_question(index, question, k=k, embedding_model=embedding_model, chat_model=chat_model)
     )
     typer.echo(result.answer)
     if result.sources:

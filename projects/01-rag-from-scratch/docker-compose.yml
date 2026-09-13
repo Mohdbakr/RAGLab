@@ -1,0 +1,7 @@
+services:
+  plainrag:
+    build: .
+    env_file: .env
+    working_dir: /data
+    volumes:
+      - ./data:/data

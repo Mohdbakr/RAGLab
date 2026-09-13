@@ -25,14 +25,31 @@ It's fully standalone: no dependency on anything else in this repo.
 
 ```bash
 uv sync
-export OPENAI_API_KEY=...   # or point at any litellm-supported provider
+cp .env.example .env   # fill in OPENAI_API_KEY, or point at any litellm-supported provider
 
 uv run plainrag ingest path/to/some.txt
 uv run plainrag ask "What does the document say about X?"
 ```
 
-No Docker, no separate service — the index is just a file on disk
-(`.plainrag_index.json` by default).
+Or with `make` (see `make help` for the full list):
+
+```bash
+make install
+make ingest FILE=path/to/some.txt
+make ask QUESTION="What does the document say about X?"
+```
+
+No separate service — the index is just a file on disk
+(`.plainrag_index.json` by default). A `Dockerfile`/`docker-compose.yml`
+are included for convenience, not because anything here needs them —
+`data/` on the host is mounted into the container so ingested files and
+the index persist across runs:
+
+```bash
+make docker-build
+make docker-run ARGS="ingest some.txt"       # reads/writes under ./data
+make docker-run ARGS='ask "What does X say?"'
+```
 
 ## Why build this "the hard way"
 
