@@ -10,9 +10,9 @@ from raglab_common import configure_logging
 
 from app.catalog.loader import load_backends, load_embedding_services, load_vectorstores
 from app.core.config import get_settings
+from app.dependencies import get_embedding_services, get_vectorstores
 from app.routers import backends as backends_router
-from app.routers import embedding_services as embedding_services_router
-from app.routers import vectorstores as vectorstores_router
+from app.routers.standalone_services import build_standalone_service_router
 from app.runtime.docker_compose_runtime import DockerComposeRuntime
 from app.runtime.health import HealthChecker
 from app.services.lifecycle import LifecycleService
@@ -51,8 +51,22 @@ app = FastAPI(
     lifespan=lifespan,
 )
 app.include_router(backends_router.router)
-app.include_router(vectorstores_router.router)
-app.include_router(embedding_services_router.router)
+app.include_router(
+    build_standalone_service_router(
+        prefix="/vectorstores",
+        tag="Vector Stores",
+        kind_label="vector store",
+        get_specs=get_vectorstores,
+    )
+)
+app.include_router(
+    build_standalone_service_router(
+        prefix="/embedding-services",
+        tag="Embedding Services",
+        kind_label="embedding service",
+        get_specs=get_embedding_services,
+    )
+)
 
 
 @app.get("/healthz", tags=["Health"])

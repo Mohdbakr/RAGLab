@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 import pytest
 from fastapi.testclient import TestClient
 
-from app.catalog.models import BackendSpec, EmbeddingServiceSpec, VectorStoreSpec
+from app.catalog.models import BackendSpec, StandaloneServiceSpec
 from app.dependencies import (
     get_backends,
     get_embedding_services,
@@ -41,7 +41,7 @@ def backend(**overrides: object) -> BackendSpec:
     return BackendSpec(**fields)  # type: ignore[arg-type]
 
 
-def vector_store(**overrides: object) -> VectorStoreSpec:
+def vector_store(**overrides: object) -> StandaloneServiceSpec:
     fields: dict[str, object] = {
         "id": "chroma",
         "name": "Chroma",
@@ -51,10 +51,10 @@ def vector_store(**overrides: object) -> VectorStoreSpec:
         "health_path": "/api/v1/heartbeat",
     }
     fields.update(overrides)
-    return VectorStoreSpec(**fields)  # type: ignore[arg-type]
+    return StandaloneServiceSpec(**fields)  # type: ignore[arg-type]
 
 
-def embedding_service(**overrides: object) -> EmbeddingServiceSpec:
+def embedding_service(**overrides: object) -> StandaloneServiceSpec:
     fields: dict[str, object] = {
         "id": "00-embedding-service",
         "name": "Embedding Service",
@@ -64,11 +64,15 @@ def embedding_service(**overrides: object) -> EmbeddingServiceSpec:
         "health_path": "/healthz",
     }
     fields.update(overrides)
-    return EmbeddingServiceSpec(**fields)  # type: ignore[arg-type]
+    return StandaloneServiceSpec(**fields)  # type: ignore[arg-type]
 
 
 @dataclass
 class FakeLifecycleService:
+    """One generic set of standalone-service call lists, used by both the
+    vector-store and embedding-service router tests (they now go through
+    the same LifecycleService methods)."""
+
     state: ComponentState = ComponentState.STOPPED
     start_backend_calls: list[tuple[BackendSpec, dict[str, str] | None]] = field(
         default_factory=list
@@ -77,12 +81,9 @@ class FakeLifecycleService:
     reset_backend_calls: list[tuple[BackendSpec, dict[str, str] | None]] = field(
         default_factory=list
     )
-    start_vector_store_calls: list[VectorStoreSpec] = field(default_factory=list)
-    stop_vector_store_calls: list[VectorStoreSpec] = field(default_factory=list)
-    reset_vector_store_calls: list[VectorStoreSpec] = field(default_factory=list)
-    start_embedding_service_calls: list[EmbeddingServiceSpec] = field(default_factory=list)
-    stop_embedding_service_calls: list[EmbeddingServiceSpec] = field(default_factory=list)
-    reset_embedding_service_calls: list[EmbeddingServiceSpec] = field(default_factory=list)
+    start_standalone_service_calls: list[StandaloneServiceSpec] = field(default_factory=list)
+    stop_standalone_service_calls: list[StandaloneServiceSpec] = field(default_factory=list)
+    reset_standalone_service_calls: list[StandaloneServiceSpec] = field(default_factory=list)
 
     def start_backend(self, spec: BackendSpec, env: dict[str, str] | None = None) -> None:
         self.start_backend_calls.append((spec, env))
@@ -96,28 +97,16 @@ class FakeLifecycleService:
     async def get_backend_status(self, spec: BackendSpec) -> ComponentState:
         return self.state
 
-    def start_vector_store(self, spec: VectorStoreSpec) -> None:
-        self.start_vector_store_calls.append(spec)
+    def start_standalone_service(self, spec: StandaloneServiceSpec) -> None:
+        self.start_standalone_service_calls.append(spec)
 
-    def stop_vector_store(self, spec: VectorStoreSpec) -> None:
-        self.stop_vector_store_calls.append(spec)
+    def stop_standalone_service(self, spec: StandaloneServiceSpec) -> None:
+        self.stop_standalone_service_calls.append(spec)
 
-    def reset_vector_store(self, spec: VectorStoreSpec) -> None:
-        self.reset_vector_store_calls.append(spec)
+    def reset_standalone_service(self, spec: StandaloneServiceSpec) -> None:
+        self.reset_standalone_service_calls.append(spec)
 
-    async def get_vector_store_status(self, spec: VectorStoreSpec) -> ComponentState:
-        return self.state
-
-    def start_embedding_service(self, spec: EmbeddingServiceSpec) -> None:
-        self.start_embedding_service_calls.append(spec)
-
-    def stop_embedding_service(self, spec: EmbeddingServiceSpec) -> None:
-        self.stop_embedding_service_calls.append(spec)
-
-    def reset_embedding_service(self, spec: EmbeddingServiceSpec) -> None:
-        self.reset_embedding_service_calls.append(spec)
-
-    async def get_embedding_service_status(self, spec: EmbeddingServiceSpec) -> ComponentState:
+    async def get_standalone_service_status(self, spec: StandaloneServiceSpec) -> ComponentState:
         return self.state
 
 
@@ -274,7 +263,8 @@ class TestVectorStoresRouter:
         response = client.post("/vectorstores/chroma/start")
 
         assert response.status_code == 202
-        assert len(lifecycle.start_vector_store_calls) == 1
+        [spec] = lifecycle.start_standalone_service_calls
+        assert spec.id == "chroma"
 
     def test_reset_delegates_to_the_lifecycle_service(
         self, client: TestClient, lifecycle: FakeLifecycleService
@@ -282,7 +272,8 @@ class TestVectorStoresRouter:
         response = client.post("/vectorstores/chroma/reset")
 
         assert response.status_code == 202
-        assert len(lifecycle.reset_vector_store_calls) == 1
+        [spec] = lifecycle.reset_standalone_service_calls
+        assert spec.id == "chroma"
 
     def test_get_unknown_vector_store_is_404(self, client: TestClient) -> None:
         assert client.get("/vectorstores/does-not-exist").status_code == 404
@@ -307,7 +298,8 @@ class TestEmbeddingServicesRouter:
         response = client.post("/embedding-services/00-embedding-service/start")
 
         assert response.status_code == 202
-        assert len(lifecycle.start_embedding_service_calls) == 1
+        [spec] = lifecycle.start_standalone_service_calls
+        assert spec.id == "00-embedding-service"
 
     def test_reset_delegates_to_the_lifecycle_service(
         self, client: TestClient, lifecycle: FakeLifecycleService
@@ -315,7 +307,8 @@ class TestEmbeddingServicesRouter:
         response = client.post("/embedding-services/00-embedding-service/reset")
 
         assert response.status_code == 202
-        assert len(lifecycle.reset_embedding_service_calls) == 1
+        [spec] = lifecycle.reset_standalone_service_calls
+        assert spec.id == "00-embedding-service"
 
     def test_get_unknown_embedding_service_is_404(self, client: TestClient) -> None:
         assert client.get("/embedding-services/does-not-exist").status_code == 404

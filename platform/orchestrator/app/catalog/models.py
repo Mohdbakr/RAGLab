@@ -56,32 +56,14 @@ class BackendSpec(BaseModel):
         return self
 
 
-class VectorStoreSpec(BaseModel):
-    """One entry from ``catalog/vectorstores.yaml``.
+class StandaloneServiceSpec(BaseModel):
+    """One entry from a standalone-service catalog file.
 
-    Attributes:
-        id: Unique slug.
-        name: Human-readable display name.
-        compose_path: Path (from the repo root) to a compose file that
-            stands up just this store.
-        host: Hostname the store is reachable at once its stack is up.
-        port: Primary client port.
-        health_path: HTTP path polled for health, empty for a TCP-only
-            check.
-        status: Delivery status, tracked as each weekend milestone lands.
-    """
-
-    id: str
-    name: str
-    compose_path: str
-    host: str
-    port: int
-    health_path: str = ""
-    status: CatalogStatus = "planned"
-
-
-class EmbeddingServiceSpec(BaseModel):
-    """One entry from ``catalog/embedding_services.yaml``.
+    Covers every kind of shared infrastructure the launcher can start
+    independently of any one backend (``catalog/vectorstores.yaml``,
+    ``catalog/embedding_services.yaml``, and future kinds) — they all
+    share this exact shape, so there's one model rather than a
+    near-identical copy per kind.
 
     Attributes:
         id: Unique slug.

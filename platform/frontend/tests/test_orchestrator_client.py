@@ -11,9 +11,8 @@ import pytest
 
 from raglab_frontend.orchestrator_client import (
     BackendStatus,
-    EmbeddingServiceStatus,
     OrchestratorClient,
-    VectorStoreStatus,
+    StandaloneServiceStatus,
 )
 
 BACKEND_PAYLOAD = {
@@ -106,7 +105,7 @@ class TestListVectorStores:
 
         [status] = client.list_vector_stores()
 
-        assert isinstance(status, VectorStoreStatus)
+        assert isinstance(status, StandaloneServiceStatus)
         assert status.spec.id == "chroma"
         assert status.state == "stopped"
 
@@ -120,7 +119,7 @@ class TestListEmbeddingServices:
 
         [status] = client.list_embedding_services()
 
-        assert isinstance(status, EmbeddingServiceStatus)
+        assert isinstance(status, StandaloneServiceStatus)
         assert status.spec.id == "00-embedding-service"
         assert status.state == "stopped"
 

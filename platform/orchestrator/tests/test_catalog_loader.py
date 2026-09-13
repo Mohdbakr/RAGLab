@@ -9,7 +9,7 @@ import yaml
 from pydantic import ValidationError
 
 from app.catalog.loader import load_backends, load_embedding_services, load_vectorstores
-from app.catalog.models import BackendSpec, EmbeddingServiceSpec, VectorStoreSpec
+from app.catalog.models import BackendSpec, StandaloneServiceSpec
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
@@ -131,7 +131,7 @@ class TestLoadVectorStores:
         stores = load_vectorstores(tmp_path / "vectorstores.yaml")
 
         assert stores == [
-            VectorStoreSpec(
+            StandaloneServiceSpec(
                 id="chroma",
                 name="Chroma",
                 compose_path="platform/vectorstores/chroma/docker-compose.yml",
@@ -173,7 +173,7 @@ class TestLoadEmbeddingServices:
         services = load_embedding_services(tmp_path / "embedding_services.yaml")
 
         assert services == [
-            EmbeddingServiceSpec(
+            StandaloneServiceSpec(
                 id="00-embedding-service",
                 name="Embedding Service",
                 compose_path="projects/00-embedding-service/docker-compose.yml",

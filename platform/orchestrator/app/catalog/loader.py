@@ -12,7 +12,7 @@ from typing import Any
 
 import yaml
 
-from app.catalog.models import BackendSpec, EmbeddingServiceSpec, VectorStoreSpec
+from app.catalog.models import BackendSpec, StandaloneServiceSpec
 
 
 def _read_yaml(path: Path) -> dict[str, Any]:
@@ -54,7 +54,17 @@ def load_backends(catalog_path: Path) -> list[BackendSpec]:
     return specs
 
 
-def load_vectorstores(catalog_path: Path) -> list[VectorStoreSpec]:
+def _load_standalone_services(
+    catalog_path: Path, *, yaml_key: str, kind_label: str
+) -> list[StandaloneServiceSpec]:
+    """Shared implementation behind every standalone-service loader below."""
+    raw = _read_yaml(catalog_path)
+    specs = [StandaloneServiceSpec.model_validate(entry) for entry in raw.get(yaml_key, [])]
+    _require_unique_ids([spec.id for spec in specs], kind=kind_label)
+    return specs
+
+
+def load_vectorstores(catalog_path: Path) -> list[StandaloneServiceSpec]:
     """Load and validate every vector-store entry from a ``vectorstores.yaml`` file.
 
     Args:
@@ -68,13 +78,12 @@ def load_vectorstores(catalog_path: Path) -> list[VectorStoreSpec]:
         pydantic.ValidationError: If an entry fails schema validation.
         ValueError: If two entries share the same ``id``.
     """
-    raw = _read_yaml(catalog_path)
-    specs = [VectorStoreSpec.model_validate(entry) for entry in raw.get("vectorstores", [])]
-    _require_unique_ids([spec.id for spec in specs], kind="vector store")
-    return specs
+    return _load_standalone_services(
+        catalog_path, yaml_key="vectorstores", kind_label="vector store"
+    )
 
 
-def load_embedding_services(catalog_path: Path) -> list[EmbeddingServiceSpec]:
+def load_embedding_services(catalog_path: Path) -> list[StandaloneServiceSpec]:
     """Load and validate every entry from an ``embedding_services.yaml`` file.
 
     Args:
@@ -88,10 +97,6 @@ def load_embedding_services(catalog_path: Path) -> list[EmbeddingServiceSpec]:
         pydantic.ValidationError: If an entry fails schema validation.
         ValueError: If two entries share the same ``id``.
     """
-    raw = _read_yaml(catalog_path)
-    specs = [
-        EmbeddingServiceSpec.model_validate(entry)
-        for entry in raw.get("embedding_services", [])
-    ]
-    _require_unique_ids([spec.id for spec in specs], kind="embedding service")
-    return specs
+    return _load_standalone_services(
+        catalog_path, yaml_key="embedding_services", kind_label="embedding service"
+    )

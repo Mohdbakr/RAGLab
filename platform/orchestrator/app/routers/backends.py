@@ -5,7 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from app.catalog.models import BackendSpec, EmbeddingServiceSpec, VectorStoreSpec
+from app.catalog.models import BackendSpec, StandaloneServiceSpec
 from app.dependencies import (
     get_backends,
     get_embedding_services,
@@ -39,27 +39,16 @@ def _find_backend(backends: list[BackendSpec], backend_id: str) -> BackendSpec:
     raise HTTPException(status_code=404, detail=f"unknown backend: {backend_id!r}")
 
 
-def _find_vector_store(
-    vectorstores: list[VectorStoreSpec], vector_store_id: str
-) -> VectorStoreSpec:
-    for spec in vectorstores:
-        if spec.id == vector_store_id:
+def _find_standalone_service(
+    specs: list[StandaloneServiceSpec], service_id: str, kind_label: str
+) -> StandaloneServiceSpec:
+    for spec in specs:
+        if spec.id == service_id:
             return spec
-    raise HTTPException(status_code=404, detail=f"unknown vector store: {vector_store_id!r}")
+    raise HTTPException(status_code=404, detail=f"unknown {kind_label}: {service_id!r}")
 
 
-def _find_embedding_service(
-    embedding_services: list[EmbeddingServiceSpec], embedding_service_id: str
-) -> EmbeddingServiceSpec:
-    for spec in embedding_services:
-        if spec.id == embedding_service_id:
-            return spec
-    raise HTTPException(
-        status_code=404, detail=f"unknown embedding service: {embedding_service_id!r}"
-    )
-
-
-def _vector_store_env(spec: VectorStoreSpec) -> dict[str, str]:
+def _vector_store_env(spec: StandaloneServiceSpec) -> dict[str, str]:
     return {
         "VECTOR_STORE_ID": spec.id,
         "VECTOR_STORE_HOST": spec.host,
@@ -67,7 +56,7 @@ def _vector_store_env(spec: VectorStoreSpec) -> dict[str, str]:
     }
 
 
-def _embedding_service_env(spec: EmbeddingServiceSpec) -> dict[str, str]:
+def _embedding_service_env(spec: StandaloneServiceSpec) -> dict[str, str]:
     return {
         "EMBEDDING_SERVICE_ID": spec.id,
         "EMBEDDING_SERVICE_HOST": spec.host,
@@ -79,9 +68,9 @@ def _embedding_service_env(spec: EmbeddingServiceSpec) -> dict[str, str]:
 def _resolve_env(
     backend: BackendSpec,
     vector_store_id: str | None,
-    vectorstores: list[VectorStoreSpec],
+    vectorstores: list[StandaloneServiceSpec],
     embedding_service_id: str | None,
-    embedding_services: list[EmbeddingServiceSpec],
+    embedding_services: list[StandaloneServiceSpec],
 ) -> dict[str, str] | None:
     env: dict[str, str] = {}
 
@@ -94,7 +83,8 @@ def _resolve_env(
                     f"choose one of {backend.compatible_vector_stores}"
                 ),
             )
-        env.update(_vector_store_env(_find_vector_store(vectorstores, vector_store_id)))
+        vector_store = _find_standalone_service(vectorstores, vector_store_id, "vector store")
+        env.update(_vector_store_env(vector_store))
 
     if embedding_service_id is not None:
         if embedding_service_id not in backend.compatible_embedding_services:
@@ -106,7 +96,9 @@ def _resolve_env(
                     f"{backend.compatible_embedding_services}"
                 ),
             )
-        embedding_service = _find_embedding_service(embedding_services, embedding_service_id)
+        embedding_service = _find_standalone_service(
+            embedding_services, embedding_service_id, "embedding service"
+        )
         env.update(_embedding_service_env(embedding_service))
 
     return env or None
@@ -140,8 +132,8 @@ async def start_backend(
     backend_id: str,
     body: StartOrResetBackendRequest | None = None,
     backends: list[BackendSpec] = Depends(get_backends),
-    vectorstores: list[VectorStoreSpec] = Depends(get_vectorstores),
-    embedding_services: list[EmbeddingServiceSpec] = Depends(get_embedding_services),
+    vectorstores: list[StandaloneServiceSpec] = Depends(get_vectorstores),
+    embedding_services: list[StandaloneServiceSpec] = Depends(get_embedding_services),
     lifecycle: LifecycleService = Depends(get_lifecycle_service),
 ) -> dict[str, str]:
     """Start a backend, optionally pointed at a compatible vector store and/or embedding service."""
@@ -172,8 +164,8 @@ async def reset_backend(
     backend_id: str,
     body: StartOrResetBackendRequest | None = None,
     backends: list[BackendSpec] = Depends(get_backends),
-    vectorstores: list[VectorStoreSpec] = Depends(get_vectorstores),
-    embedding_services: list[EmbeddingServiceSpec] = Depends(get_embedding_services),
+    vectorstores: list[StandaloneServiceSpec] = Depends(get_vectorstores),
+    embedding_services: list[StandaloneServiceSpec] = Depends(get_embedding_services),
     lifecycle: LifecycleService = Depends(get_lifecycle_service),
 ) -> dict[str, str]:
     """Wipe a backend's persisted state and bring it back up clean."""

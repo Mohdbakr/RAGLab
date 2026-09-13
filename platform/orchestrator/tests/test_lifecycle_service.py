@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from app.catalog.models import BackendSpec, EmbeddingServiceSpec, VectorStoreSpec
+from app.catalog.models import BackendSpec, StandaloneServiceSpec
 from app.models.status import ComponentState
 from app.services.lifecycle import LifecycleService
 
@@ -85,7 +85,7 @@ def in_process_backend(**overrides: object) -> BackendSpec:
     return BackendSpec(**fields)  # type: ignore[arg-type]
 
 
-def chroma_store(**overrides: object) -> VectorStoreSpec:
+def chroma_store(**overrides: object) -> StandaloneServiceSpec:
     fields: dict[str, object] = {
         "id": "chroma",
         "name": "Chroma",
@@ -95,10 +95,10 @@ def chroma_store(**overrides: object) -> VectorStoreSpec:
         "health_path": "/api/v1/heartbeat",
     }
     fields.update(overrides)
-    return VectorStoreSpec(**fields)  # type: ignore[arg-type]
+    return StandaloneServiceSpec(**fields)  # type: ignore[arg-type]
 
 
-def embedding_service(**overrides: object) -> EmbeddingServiceSpec:
+def embedding_service(**overrides: object) -> StandaloneServiceSpec:
     fields: dict[str, object] = {
         "id": "00-embedding-service",
         "name": "Embedding Service",
@@ -108,7 +108,7 @@ def embedding_service(**overrides: object) -> EmbeddingServiceSpec:
         "health_path": "/healthz",
     }
     fields.update(overrides)
-    return EmbeddingServiceSpec(**fields)  # type: ignore[arg-type]
+    return StandaloneServiceSpec(**fields)  # type: ignore[arg-type]
 
 
 class TestBackendLifecycle:
@@ -205,7 +205,7 @@ class TestVectorStoreLifecycle:
         runtime = FakeRuntime()
         service = LifecycleService(runtime, FakeHealthChecker(), repo_root=REPO_ROOT)
 
-        service.start_vector_store(chroma_store())
+        service.start_standalone_service(chroma_store())
 
         (call,) = runtime.up_calls
         assert call[0] == REPO_ROOT / "platform/vectorstores/chroma/docker-compose.yml"
@@ -215,7 +215,7 @@ class TestVectorStoreLifecycle:
         runtime = FakeRuntime(running=True)
         service = LifecycleService(runtime, FakeHealthChecker(), repo_root=REPO_ROOT)
 
-        service.reset_vector_store(chroma_store())
+        service.reset_standalone_service(chroma_store())
 
         assert runtime.down_calls[0][1] == "chroma"
         assert runtime.down_calls[0][2] is True
@@ -229,7 +229,7 @@ class TestVectorStoreLifecycle:
         health = FakeHealthChecker()
         service = LifecycleService(runtime, health, repo_root=REPO_ROOT)
 
-        state = await service.get_vector_store_status(chroma_store(health_path=""))
+        state = await service.get_standalone_service_status(chroma_store(health_path=""))
 
         assert state is ComponentState.HEALTHY
         assert health.probed_urls == []  # no HTTP probe needed when there's no health path
@@ -241,7 +241,7 @@ class TestVectorStoreLifecycle:
         service = LifecycleService(runtime, health, repo_root=REPO_ROOT)
 
         spec = chroma_store()
-        await service.get_vector_store_status(spec)
+        await service.get_standalone_service_status(spec)
 
         assert health.probed_urls == [f"http://{spec.host}:{spec.port}{spec.health_path}"]
 
@@ -251,7 +251,7 @@ class TestVectorStoreLifecycle:
         service = LifecycleService(runtime, FakeHealthChecker(), repo_root=REPO_ROOT)
 
         assert (
-            await service.get_vector_store_status(chroma_store()) is ComponentState.STOPPED
+            await service.get_standalone_service_status(chroma_store()) is ComponentState.STOPPED
         )
 
 
@@ -260,7 +260,7 @@ class TestEmbeddingServiceLifecycle:
         runtime = FakeRuntime()
         service = LifecycleService(runtime, FakeHealthChecker(), repo_root=REPO_ROOT)
 
-        service.start_embedding_service(embedding_service())
+        service.start_standalone_service(embedding_service())
 
         (call,) = runtime.up_calls
         assert call[0] == REPO_ROOT / "projects/00-embedding-service/docker-compose.yml"
@@ -270,7 +270,7 @@ class TestEmbeddingServiceLifecycle:
         runtime = FakeRuntime(running=True)
         service = LifecycleService(runtime, FakeHealthChecker(), repo_root=REPO_ROOT)
 
-        service.reset_embedding_service(embedding_service())
+        service.reset_standalone_service(embedding_service())
 
         assert runtime.down_calls[0][1] == "00-embedding-service"
         assert runtime.down_calls[0][2] is True
@@ -283,7 +283,7 @@ class TestEmbeddingServiceLifecycle:
         service = LifecycleService(runtime, health, repo_root=REPO_ROOT)
 
         spec = embedding_service()
-        await service.get_embedding_service_status(spec)
+        await service.get_standalone_service_status(spec)
 
         assert health.probed_urls == [f"http://{spec.host}:{spec.port}{spec.health_path}"]
 
@@ -293,6 +293,6 @@ class TestEmbeddingServiceLifecycle:
         service = LifecycleService(runtime, FakeHealthChecker(), repo_root=REPO_ROOT)
 
         assert (
-            await service.get_embedding_service_status(embedding_service())
+            await service.get_standalone_service_status(embedding_service())
             is ComponentState.STOPPED
         )
