@@ -37,7 +37,7 @@ sitting loose next to `cli.py`, and `logging_setup.py` becomes
 
 ## Package layout
 
-```
+```text
 src/plainrag/
   __init__.py
   cli.py                  # entry point — the only loose module
@@ -171,7 +171,7 @@ exit code 1 — the actual "production grade" tell for a CLI tool.
 
 Tests move to mirror the new layout:
 
-```
+```text
 tests/
   test_cli.py
   test_config.py            # new
