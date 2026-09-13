@@ -6,6 +6,8 @@ Thin by design — all HTTP/call-sequencing logic lives in
 
 from __future__ import annotations
 
+import time
+
 import streamlit as st
 from raglab_common import configure_logging
 
@@ -38,7 +40,9 @@ def _state_badge(state: str) -> str:
     return f"{_STATE_ICONS.get(state, '⚪')} {state}"
 
 
-def render_sidebar(client: OrchestratorClient) -> tuple[str | None, str | None, str | None]:
+def render_sidebar(
+    client: OrchestratorClient,
+) -> tuple[str | None, str | None, str | None, bool]:
     """Render the backend/vector-store/embedding-service pickers and lifecycle controls.
 
     Args:
@@ -46,8 +50,11 @@ def render_sidebar(client: OrchestratorClient) -> tuple[str | None, str | None, 
 
     Returns:
         The currently selected (backend_id, vector_store_id,
-        embedding_service_id); any may be None if nothing is selectable
-        yet.
+        embedding_service_id, still_starting); the ids may be None if
+        nothing is selectable yet. ``still_starting`` is true whenever
+        any selected component's live status came back as "starting",
+        so the caller knows to keep polling rather than wait for a
+        manual refresh.
     """
     st.sidebar.title("🧪 RAGLab")
     st.sidebar.caption("Pick a backend, launch it, try it.")
@@ -57,11 +64,11 @@ def render_sidebar(client: OrchestratorClient) -> tuple[str | None, str | None, 
     except Exception as exc:  # noqa: BLE001 - surfaced to the user, not swallowed
         st.sidebar.error(f"Can't reach the orchestrator: {exc}")
         log.warning("failed to list backends: {}", exc)
-        return None, None, None
+        return None, None, None, False
 
     if not backends:
         st.sidebar.warning("No backends in the catalog yet.")
-        return None, None, None
+        return None, None, None, False
 
     options = {f"{b.spec.name} ({b.spec.level})": b for b in backends}
     chosen = st.sidebar.selectbox("Backend", list(options.keys()))
@@ -111,8 +118,11 @@ def render_sidebar(client: OrchestratorClient) -> tuple[str | None, str | None, 
             st.rerun()
 
     st.sidebar.divider()
+    still_starting = False
     try:
-        st.sidebar.write(f"Backend: {_state_badge(client.get_backend_status(backend.id).state)}")
+        backend_state = client.get_backend_status(backend.id).state
+        st.sidebar.write(f"Backend: {_state_badge(backend_state)}")
+        still_starting |= backend_state == "starting"
     except Exception as exc:  # noqa: BLE001
         st.sidebar.write("Backend: unknown")
         log.debug("status check failed for {}: {}", backend.id, exc)
@@ -120,6 +130,7 @@ def render_sidebar(client: OrchestratorClient) -> tuple[str | None, str | None, 
         try:
             vs_state = client.get_vector_store_status(vector_store_id).state
             st.sidebar.write(f"Vector store: {_state_badge(vs_state)}")
+            still_starting |= vs_state == "starting"
         except Exception as exc:  # noqa: BLE001
             st.sidebar.write("Vector store: unknown")
             log.debug("status check failed for {}: {}", vector_store_id, exc)
@@ -127,11 +138,12 @@ def render_sidebar(client: OrchestratorClient) -> tuple[str | None, str | None, 
         try:
             es_state = client.get_embedding_service_status(embedding_service_id).state
             st.sidebar.write(f"Embedding service: {_state_badge(es_state)}")
+            still_starting |= es_state == "starting"
         except Exception as exc:  # noqa: BLE001
             st.sidebar.write("Embedding service: unknown")
             log.debug("status check failed for {}: {}", embedding_service_id, exc)
 
-    return backend.id, vector_store_id, embedding_service_id
+    return backend.id, vector_store_id, embedding_service_id, still_starting
 
 
 def render_main(
@@ -171,12 +183,18 @@ def render_main(
         st.info("No benchmark data yet.")
 
 
+_POLL_INTERVAL_SECONDS = 2
+
+
 def main() -> None:
     """Entry point Streamlit runs."""
     page_setup()
     client = get_client()
-    backend_id, vector_store_id, _embedding_service_id = render_sidebar(client)
+    backend_id, vector_store_id, _embedding_service_id, still_starting = render_sidebar(client)
     render_main(client, backend_id, vector_store_id)
+    if still_starting:
+        time.sleep(_POLL_INTERVAL_SECONDS)
+        st.rerun()
 
 
 if __name__ == "__main__":
