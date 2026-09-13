@@ -13,6 +13,7 @@ from typing import Any
 import pytest
 from typer.testing import CliRunner
 
+from plainrag.core.exceptions import EmbeddingError
 from plainrag.domain.models import AnswerResult, DocumentChunk, ScoredChunk
 from plainrag.services.index import CosineSimilarityIndex
 
@@ -76,6 +77,25 @@ class TestIngestCommand:
         assert result.exit_code == 0
         assert index_path.exists()
         assert len(CosineSimilarityIndex.load(index_path)) == 1
+
+    def test_exits_with_an_error_when_ingest_text_fails(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from plainrag import cli
+
+        source_file = tmp_path / "doc.txt"
+        source_file.write_text("some content")
+
+        async def failing_ingest_text(
+            index: CosineSimilarityIndex, text: str, source: str, **kwargs: Any
+        ) -> int:
+            raise EmbeddingError("embedding provider unavailable")
+
+        monkeypatch.setattr(cli, "ingest_text", failing_ingest_text)
+
+        result = runner.invoke(cli.app, ["ingest", str(source_file)])
+
+        assert result.exit_code == 1
 
 
 class TestAskCommand:
