@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from plainrag.chunking import chunk_text
+from plainrag.domain.chunking import chunk_text
 
 
 class TestChunkText:
