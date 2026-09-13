@@ -5,7 +5,8 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from raglab_common import configure_logging
 
 from app.catalog.loader import load_backends, load_embedding_services, load_vectorstores
@@ -13,7 +14,7 @@ from app.core.config import get_settings
 from app.dependencies import get_embedding_services, get_vectorstores
 from app.routers import backends as backends_router
 from app.routers.standalone_services import build_standalone_service_router
-from app.runtime.docker_compose_runtime import DockerComposeRuntime
+from app.runtime.docker_compose_runtime import DockerComposeCommandError, DockerComposeRuntime
 from app.runtime.health import HealthChecker
 from app.services.lifecycle import LifecycleService
 
@@ -67,6 +68,22 @@ app.include_router(
         get_specs=get_embedding_services,
     )
 )
+
+
+@app.exception_handler(DockerComposeCommandError)
+async def handle_docker_compose_command_error(
+    request: Request, exc: DockerComposeCommandError
+) -> JSONResponse:
+    """Surface a failed `docker compose` invocation as a clear error.
+
+    Without this, a failure (a missing .env file, a bad Dockerfile, ...)
+    propagates as a bare, undetailed 500 that the frontend can only show
+    as a raw traceback. 502 signals "the orchestrator's downstream
+    command failed", with the actual command/stderr in the body so the
+    frontend can show the real reason.
+    """
+    log.warning("docker compose command failed: {}", exc)
+    return JSONResponse(status_code=502, content={"detail": str(exc)})
 
 
 @app.get("/healthz", tags=["Health"])

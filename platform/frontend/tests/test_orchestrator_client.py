@@ -13,6 +13,7 @@ from raglab_frontend.orchestrator_client import (
     BackendStatus,
     OrchestratorClient,
     StandaloneServiceStatus,
+    describe_error,
 )
 
 BACKEND_PAYLOAD = {
@@ -253,3 +254,24 @@ class TestEmbeddingServiceLifecycle:
             "/embedding-services/00-embedding-service/stop",
             "/embedding-services/00-embedding-service/reset",
         ]
+
+
+def _http_status_error(status_code: int, **response_kwargs: object) -> httpx.HTTPStatusError:
+    request = httpx.Request("POST", "http://orchestrator:8100/backends/foo/start")
+    response = httpx.Response(status_code, request=request, **response_kwargs)  # type: ignore[arg-type]
+    return httpx.HTTPStatusError("boom", request=request, response=response)
+
+
+class TestDescribeError:
+    def test_extracts_the_orchestrators_detail_message(self) -> None:
+        exc = _http_status_error(502, json={"detail": "env file /repo/.env not found"})
+
+        assert describe_error(exc) == "env file /repo/.env not found"
+
+    def test_falls_back_to_the_status_code_when_the_body_has_no_detail(self) -> None:
+        exc = _http_status_error(500, text="Internal Server Error")
+
+        assert describe_error(exc) == "The orchestrator returned HTTP 500."
+
+    def test_falls_back_to_str_for_a_non_http_exception(self) -> None:
+        assert describe_error(ConnectionError("connection refused")) == "connection refused"

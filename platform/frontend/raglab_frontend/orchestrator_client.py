@@ -12,6 +12,32 @@ from typing import Literal
 import httpx
 from pydantic import BaseModel
 
+
+def describe_error(exc: Exception) -> str:
+    """Turn an exception from an `OrchestratorClient` call into a user-facing message.
+
+    Args:
+        exc: The exception raised by a client call — typically an
+            `httpx.HTTPStatusError` from `raise_for_status()`.
+
+    Returns:
+        The orchestrator's own ``detail`` message when the response
+        carries one (its error responses, including a failed `docker
+        compose` command, use that shape), a short fallback built from
+        the status code otherwise, or just ``str(exc)`` for anything
+        that isn't an HTTP error at all (e.g. a connection failure).
+    """
+    if isinstance(exc, httpx.HTTPStatusError):
+        try:
+            detail = exc.response.json().get("detail")
+        except ValueError:
+            detail = None
+        if detail:
+            return str(detail)
+        return f"The orchestrator returned HTTP {exc.response.status_code}."
+    return str(exc)
+
+
 Level = Literal["basic", "intermediate", "advanced"]
 CatalogStatus = Literal["planned", "in_progress", "shipped"]
 

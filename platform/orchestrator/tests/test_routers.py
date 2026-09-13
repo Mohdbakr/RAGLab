@@ -21,6 +21,7 @@ from app.dependencies import (
 )
 from app.main import app
 from app.models.status import ComponentState
+from app.runtime.docker_compose_runtime import DockerComposeCommandError
 
 
 def backend(**overrides: object) -> BackendSpec:
@@ -84,8 +85,11 @@ class FakeLifecycleService:
     start_standalone_service_calls: list[StandaloneServiceSpec] = field(default_factory=list)
     stop_standalone_service_calls: list[StandaloneServiceSpec] = field(default_factory=list)
     reset_standalone_service_calls: list[StandaloneServiceSpec] = field(default_factory=list)
+    raise_on_start_backend: Exception | None = None
 
     def start_backend(self, spec: BackendSpec, env: dict[str, str] | None = None) -> None:
+        if self.raise_on_start_backend is not None:
+            raise self.raise_on_start_backend
         self.start_backend_calls.append((spec, env))
 
     def stop_backend(self, spec: BackendSpec) -> None:
@@ -226,6 +230,18 @@ class TestBackendsRouter:
             "EMBEDDING_SERVICE_PORT": "9100",
             "EMBEDDING_SERVICE_URL": "http://localhost:9100",
         }
+
+    def test_a_failed_compose_command_is_surfaced_as_502_with_its_message(
+        self, client: TestClient, lifecycle: FakeLifecycleService
+    ) -> None:
+        lifecycle.raise_on_start_backend = DockerComposeCommandError(
+            ["docker", "compose", "up", "-d"], 1, "env file /repo/.env not found"
+        )
+
+        response = client.post("/backends/03-production-rag-reference/start", json={})
+
+        assert response.status_code == 502
+        assert "env file /repo/.env not found" in response.json()["detail"]
 
     def test_stop_delegates_to_the_lifecycle_service(
         self, client: TestClient, lifecycle: FakeLifecycleService

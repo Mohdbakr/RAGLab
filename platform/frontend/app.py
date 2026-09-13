@@ -11,7 +11,7 @@ from raglab_common import configure_logging
 
 from config import settings
 from raglab_frontend.launch_actions import launch, reset, stop
-from raglab_frontend.orchestrator_client import OrchestratorClient
+from raglab_frontend.orchestrator_client import OrchestratorClient, describe_error
 from raglab_frontend.ordering import sort_basic_to_advanced
 
 log = configure_logging(project_id="frontend")
@@ -85,15 +85,30 @@ def render_sidebar(client: OrchestratorClient) -> tuple[str | None, str | None, 
 
     launch_col, stop_col, reset_col = st.sidebar.columns(3)
     if launch_col.button("▶ Launch", use_container_width=True):
-        with st.spinner("Starting..."):
-            launch(client, backend.id, vector_store_id, embedding_service_id)
-        st.rerun()
+        try:
+            with st.spinner("Starting..."):
+                launch(client, backend.id, vector_store_id, embedding_service_id)
+        except Exception as exc:  # noqa: BLE001 - surfaced to the user, not swallowed
+            st.sidebar.error(f"Couldn't start {backend.name}: {describe_error(exc)}")
+            log.warning("launch failed for {}: {}", backend.id, exc)
+        else:
+            st.rerun()
     if stop_col.button("■ Stop", use_container_width=True):
-        stop(client, backend.id, vector_store_id, embedding_service_id)
-        st.rerun()
+        try:
+            stop(client, backend.id, vector_store_id, embedding_service_id)
+        except Exception as exc:  # noqa: BLE001
+            st.sidebar.error(f"Couldn't stop {backend.name}: {describe_error(exc)}")
+            log.warning("stop failed for {}: {}", backend.id, exc)
+        else:
+            st.rerun()
     if reset_col.button("⟲ Reset", use_container_width=True):
-        reset(client, backend.id, vector_store_id, embedding_service_id)
-        st.rerun()
+        try:
+            reset(client, backend.id, vector_store_id, embedding_service_id)
+        except Exception as exc:  # noqa: BLE001
+            st.sidebar.error(f"Couldn't reset {backend.name}: {describe_error(exc)}")
+            log.warning("reset failed for {}: {}", backend.id, exc)
+        else:
+            st.rerun()
 
     st.sidebar.divider()
     try:
