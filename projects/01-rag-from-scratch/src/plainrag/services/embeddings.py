@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import litellm
 
+from plainrag.core.exceptions import EmbeddingError
+
 
 async def embed_texts(
     texts: list[str], *, model: str = "text-embedding-3-small"
@@ -23,8 +25,16 @@ async def embed_texts(
     Returns:
         One vector per input text, same order. Empty list for empty input
         (no API call made).
+
+    Raises:
+        EmbeddingError: If the underlying provider call fails.
     """
     if not texts:
         return []
-    response = await litellm.aembedding(model=model, input=texts)
+    try:
+        response = await litellm.aembedding(model=model, input=texts)
+    except Exception as e:
+        raise EmbeddingError(
+            f"Failed to embed {len(texts)} text(s) with model {model!r}: {e}"
+        ) from e
     return [item.embedding for item in response.data]

@@ -10,7 +10,8 @@ from typing import Any
 
 import pytest
 
-from plainrag.embeddings import embed_texts
+from plainrag.core.exceptions import EmbeddingError
+from plainrag.services.embeddings import embed_texts
 
 
 @dataclass
@@ -39,7 +40,7 @@ class TestEmbedTexts:
                 ]
             )
 
-        monkeypatch.setattr("plainrag.embeddings.litellm.aembedding", fake_aembedding)
+        monkeypatch.setattr("plainrag.services.embeddings.litellm.aembedding", fake_aembedding)
 
         vectors = await embed_texts(["hello", "world"], model="text-embedding-3-small")
 
@@ -54,6 +55,18 @@ class TestEmbedTexts:
         async def fake_aembedding(**kwargs: Any) -> FakeEmbeddingResponse:
             raise AssertionError("should not be called for empty input")
 
-        monkeypatch.setattr("plainrag.embeddings.litellm.aembedding", fake_aembedding)
+        monkeypatch.setattr("plainrag.services.embeddings.litellm.aembedding", fake_aembedding)
 
         assert await embed_texts([]) == []
+
+    @pytest.mark.asyncio
+    async def test_wraps_a_litellm_failure_in_embedding_error(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        async def failing_aembedding(**kwargs: Any) -> FakeEmbeddingResponse:
+            raise RuntimeError("connection refused")
+
+        monkeypatch.setattr("plainrag.services.embeddings.litellm.aembedding", failing_aembedding)
+
+        with pytest.raises(EmbeddingError, match="connection refused"):
+            await embed_texts(["hello"])
