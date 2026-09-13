@@ -6,7 +6,9 @@ from pathlib import Path
 
 import pytest
 
-from plainrag.index import CosineSimilarityIndex, DocumentChunk
+from plainrag.core.exceptions import IndexPersistenceError
+from plainrag.domain.models import DocumentChunk
+from plainrag.services.index import CosineSimilarityIndex
 
 
 def chunk(text: str, embedding: list[float], source: str = "doc.txt") -> DocumentChunk:
@@ -96,3 +98,29 @@ class TestSaveAndLoad:
     def test_loading_a_missing_file_returns_an_empty_index(self, tmp_path: Path) -> None:
         loaded = CosineSimilarityIndex.load(tmp_path / "does-not-exist.json")
         assert len(loaded) == 0
+
+    def test_loading_a_corrupt_file_raises_index_persistence_error(self, tmp_path: Path) -> None:
+        path = tmp_path / "corrupt.json"
+        path.write_text("not valid json {")
+
+        with pytest.raises(IndexPersistenceError, match="corrupt.json"):
+            CosineSimilarityIndex.load(path)
+
+    def test_loading_a_malformed_record_raises_index_persistence_error(
+        self, tmp_path: Path
+    ) -> None:
+        path = tmp_path / "malformed.json"
+        path.write_text('[{"text": "a"}]')  # missing required fields
+
+        with pytest.raises(IndexPersistenceError, match="malformed.json"):
+            CosineSimilarityIndex.load(path)
+
+    def test_saving_to_an_unwritable_path_raises_index_persistence_error(
+        self, tmp_path: Path
+    ) -> None:
+        path = tmp_path / "nonexistent-dir" / "index.json"
+        index = CosineSimilarityIndex()
+        index.add([chunk("a", [1.0, 0.0])])
+
+        with pytest.raises(IndexPersistenceError, match="index.json"):
+            index.save(path)

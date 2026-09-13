@@ -8,34 +8,13 @@ separate concern once scale actually demands it.
 from __future__ import annotations
 
 import json
-from dataclasses import asdict, dataclass
+from dataclasses import asdict
 from pathlib import Path
 
 import numpy as np
 
-
-@dataclass
-class DocumentChunk:
-    """One chunk of source text, embedded and ready to be searched.
-
-    Attributes:
-        text: The chunk's raw text.
-        source: Where it came from (e.g. a file path), surfaced as a
-            citation when the chunk is retrieved.
-        embedding: Its embedding vector.
-    """
-
-    text: str
-    source: str
-    embedding: list[float]
-
-
-@dataclass
-class ScoredChunk:
-    """A retrieved chunk paired with its similarity to the query."""
-
-    chunk: DocumentChunk
-    score: float
+from plainrag.core.exceptions import IndexPersistenceError
+from plainrag.domain.models import DocumentChunk, ScoredChunk
 
 
 class CosineSimilarityIndex:
@@ -87,8 +66,14 @@ class CosineSimilarityIndex:
 
         Args:
             path: Where to write it.
+
+        Raises:
+            IndexPersistenceError: If the file can't be written.
         """
-        path.write_text(json.dumps([asdict(c) for c in self._chunks]))
+        try:
+            path.write_text(json.dumps([asdict(c) for c in self._chunks]))
+        except OSError as e:
+            raise IndexPersistenceError(f"Could not save index to {path}: {e}") from e
 
     @classmethod
     def load(cls, path: Path) -> CosineSimilarityIndex:
@@ -99,10 +84,17 @@ class CosineSimilarityIndex:
 
         Returns:
             The loaded index, or an empty one if ``path`` doesn't exist.
+
+        Raises:
+            IndexPersistenceError: If ``path`` exists but can't be read
+                or contains malformed data.
         """
         index = cls()
         if not path.exists():
             return index
-        data = json.loads(path.read_text())
-        index._chunks = [DocumentChunk(**item) for item in data]
+        try:
+            data = json.loads(path.read_text())
+            index._chunks = [DocumentChunk(**item) for item in data]
+        except (OSError, json.JSONDecodeError, TypeError, KeyError) as e:
+            raise IndexPersistenceError(f"Could not load index from {path}: {e}") from e
         return index
