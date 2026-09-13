@@ -13,8 +13,8 @@ from typing import Any
 import pytest
 from typer.testing import CliRunner
 
-from plainrag.index import CosineSimilarityIndex, DocumentChunk, ScoredChunk
-from plainrag.rag import AnswerResult
+from plainrag.domain.models import AnswerResult, DocumentChunk, ScoredChunk
+from plainrag.services.index import CosineSimilarityIndex
 
 runner = CliRunner()
 
@@ -115,3 +115,31 @@ class TestAskCommand:
         assert result.exit_code == 0
         assert "42" in result.output
         assert "doc.txt" in result.output
+
+
+class TestBanner:
+    def test_prints_on_a_real_command(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from plainrag import cli
+
+        source_file = tmp_path / "doc.txt"
+        source_file.write_text("content")
+
+        async def fake_ingest_text(
+            index: CosineSimilarityIndex, text: str, source: str, **kwargs: Any
+        ) -> int:
+            return 0
+
+        monkeypatch.setattr(cli, "ingest_text", fake_ingest_text)
+
+        result = runner.invoke(cli.app, ["ingest", str(source_file)])
+
+        assert "no vector-DB service" in result.output
+
+    def test_does_not_print_on_help(self) -> None:
+        from plainrag import cli
+
+        result = runner.invoke(cli.app, ["--help"])
+
+        assert "no vector-DB service" not in result.output
