@@ -1,0 +1,52 @@
+[project]
+name = "ragscratch"
+version = "0.1.0"
+description = "RAG built from scratch: manual chunking, direct embedding calls, a NumPy cosine-similarity index, manual prompt assembly with citations — no RAG framework, no vector-DB service."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "litellm>=1.52",
+    "pydantic>=2.9",
+    "loguru>=0.7.2",
+    "typer>=0.15",
+    "numpy>=2.1",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "pytest-cov>=6.0",
+    "ruff>=0.8",
+    "mypy>=1.13",
+]
+
+[project.scripts]
+ragscratch = "ragscratch.cli:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["ragscratch"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.ruff.lint.per-file-ignores]
+# typer's calls-in-defaults pattern (`= typer.Option(...)`) is the documented,
+# idiomatic way to declare CLI parameters — not a real mutable-default bug.
+"ragscratch/cli.py" = ["B008"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+
+[tool.pytest.ini_options]
+addopts = "--cov=ragscratch --cov-report=term-missing"
+asyncio_mode = "auto"
