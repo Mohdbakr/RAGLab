@@ -9,7 +9,8 @@ from __future__ import annotations
 
 import litellm
 
-from plainrag.index import ScoredChunk
+from plainrag.core.exceptions import GenerationError
+from plainrag.domain.models import ScoredChunk
 
 _SYSTEM_PROMPT = (
     "You are a precise research assistant. Answer the question using ONLY "
@@ -71,7 +72,13 @@ async def answer_question(
     Returns:
         The model's answer text, or an empty string if the model returned
         no text content.
+
+    Raises:
+        GenerationError: If the underlying provider call fails.
     """
     messages = build_messages(question, chunks)
-    response = await litellm.acompletion(model=model, messages=messages, temperature=0.0)
+    try:
+        response = await litellm.acompletion(model=model, messages=messages, temperature=0.0)
+    except Exception as e:
+        raise GenerationError(f"Failed to generate an answer with model {model!r}: {e}") from e
     return response.choices[0].message.content or ""

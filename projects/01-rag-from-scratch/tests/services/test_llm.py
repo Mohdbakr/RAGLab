@@ -7,8 +7,9 @@ from typing import Any
 
 import pytest
 
-from plainrag.index import DocumentChunk, ScoredChunk
-from plainrag.llm import answer_question, build_context_block, build_messages
+from plainrag.core.exceptions import GenerationError
+from plainrag.domain.models import DocumentChunk, ScoredChunk
+from plainrag.services.llm import answer_question, build_context_block, build_messages
 
 
 def scored(text: str, source: str, score: float) -> ScoredChunk:
@@ -76,7 +77,7 @@ class TestAnswerQuestion:
             captured.update(kwargs)
             return FakeCompletionResponse(choices=[FakeChoice(message=FakeMessage(content="42"))])
 
-        monkeypatch.setattr("plainrag.llm.litellm.acompletion", fake_acompletion)
+        monkeypatch.setattr("plainrag.services.llm.litellm.acompletion", fake_acompletion)
 
         answer = await answer_question(
             "What is the answer?",
@@ -94,8 +95,20 @@ class TestAnswerQuestion:
         async def fake_acompletion(**kwargs: Any) -> FakeCompletionResponse:
             return FakeCompletionResponse(choices=[FakeChoice(message=FakeMessage(content=None))])
 
-        monkeypatch.setattr("plainrag.llm.litellm.acompletion", fake_acompletion)
+        monkeypatch.setattr("plainrag.services.llm.litellm.acompletion", fake_acompletion)
 
         answer = await answer_question("Q?", [])
 
         assert answer == ""
+
+    @pytest.mark.asyncio
+    async def test_wraps_a_litellm_failure_in_generation_error(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        async def failing_acompletion(**kwargs: Any) -> FakeCompletionResponse:
+            raise RuntimeError("rate limited")
+
+        monkeypatch.setattr("plainrag.services.llm.litellm.acompletion", failing_acompletion)
+
+        with pytest.raises(GenerationError, match="rate limited"):
+            await answer_question("Q?", [])
