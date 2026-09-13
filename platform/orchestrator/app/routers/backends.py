@@ -143,7 +143,7 @@ async def start_backend(
     env = _resolve_env(
         spec, vector_store_id, vectorstores, embedding_service_id, embedding_services
     )
-    lifecycle.start_backend(spec, env=env)
+    await lifecycle.start_backend(spec, env=env)
     return {"state": "starting"}
 
 
@@ -155,7 +155,7 @@ async def stop_backend(
 ) -> dict[str, str]:
     """Stop a backend's stack."""
     spec = _find_backend(backends, backend_id)
-    lifecycle.stop_backend(spec)
+    await lifecycle.stop_backend(spec)
     return {"state": "stopped"}
 
 
@@ -175,5 +175,5 @@ async def reset_backend(
     env = _resolve_env(
         spec, vector_store_id, vectorstores, embedding_service_id, embedding_services
     )
-    lifecycle.reset_backend(spec, env=env)
+    await lifecycle.reset_backend(spec, env=env)
     return {"state": "starting"}

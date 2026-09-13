@@ -87,7 +87,7 @@ def build_standalone_service_router(
     ) -> dict[str, str]:
         """Start this entry's stack."""
         spec = _find(specs, service_id, kind_label)
-        lifecycle.start_standalone_service(spec)
+        await lifecycle.start_standalone_service(spec)
         return {"state": "starting"}
 
     @router.post("/{service_id}/stop", status_code=202)
@@ -98,7 +98,7 @@ def build_standalone_service_router(
     ) -> dict[str, str]:
         """Stop this entry's stack."""
         spec = _find(specs, service_id, kind_label)
-        lifecycle.stop_standalone_service(spec)
+        await lifecycle.stop_standalone_service(spec)
         return {"state": "stopped"}
 
     @router.post("/{service_id}/reset", status_code=202)
@@ -109,7 +109,7 @@ def build_standalone_service_router(
     ) -> dict[str, str]:
         """Wipe this entry's data and bring it back up clean."""
         spec = _find(specs, service_id, kind_label)
-        lifecycle.reset_standalone_service(spec)
+        await lifecycle.reset_standalone_service(spec)
         return {"state": "starting"}
 
     return router

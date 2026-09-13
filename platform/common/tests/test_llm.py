@@ -23,7 +23,7 @@ class FakeUsage:
 
 @dataclass
 class FakeMessage:
-    content: str
+    content: str | None
 
 
 @dataclass
@@ -135,6 +135,31 @@ class TestLiteLLMClient:
 
         assert response.prompt_tokens is None
         assert response.completion_tokens is None
+
+    @pytest.mark.asyncio
+    async def test_tool_call_only_response_has_no_content_and_does_not_crash(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """OpenAI/litellm set content=None when the model's turn is a tool
+        call rather than text — documented as supported via `tools` in
+        **kwargs, so this must return a response, not raise."""
+
+        async def fake_acompletion(**kwargs: Any) -> FakeCompletionResponse:
+            return FakeCompletionResponse(
+                choices=[FakeChoice(message=FakeMessage(content=None))],
+                usage=FakeUsage(prompt_tokens=5, completion_tokens=2),
+            )
+
+        monkeypatch.setattr("raglab_common.llm.litellm.acompletion", fake_acompletion)
+        client = LiteLLMClient(model="openai/gpt-4o-mini")
+
+        response = await client.complete(
+            [ChatMessage(role="user", content="hi")],
+            tools=[{"type": "function", "function": {"name": "lookup"}}],
+        )
+
+        assert response.content is None
+        assert response.prompt_tokens == 5
 
 
 class TestChatMessageRoleValidation:

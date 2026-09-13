@@ -7,6 +7,7 @@ call through here.
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Mapping
 from pathlib import Path
 
@@ -53,21 +54,34 @@ class LifecycleService:
     # `name:` key — two files can otherwise declare (or default to) the
     # same project name and get treated as one Compose project, so
     # starting/stopping/checking one leaks into the other's containers.
+    #
+    # Every runtime call runs `docker compose` as a blocking subprocess,
+    # so each is offloaded via asyncio.to_thread rather than called
+    # inline — otherwise one slow compose invocation (an image pull, a
+    # teardown, a status probe) would stall the orchestrator's single
+    # event loop and every other request it's serving.
 
-    def _start(self, compose_path: Path, project_name: str, env: Mapping[str, str] | None) -> None:
-        self._runtime.up(compose_path, project_name, env=env)
+    async def _start(
+        self, compose_path: Path, project_name: str, env: Mapping[str, str] | None
+    ) -> None:
+        await asyncio.to_thread(self._runtime.up, compose_path, project_name, env=env)
 
-    def _stop(self, compose_path: Path, project_name: str) -> None:
-        self._runtime.down(compose_path, project_name)
+    async def _stop(self, compose_path: Path, project_name: str) -> None:
+        await asyncio.to_thread(self._runtime.down, compose_path, project_name)
 
-    def _reset(self, compose_path: Path, project_name: str, env: Mapping[str, str] | None) -> None:
-        self._runtime.down(compose_path, project_name, remove_volumes=True)
-        self._runtime.up(compose_path, project_name, env=env)
+    async def _reset(
+        self, compose_path: Path, project_name: str, env: Mapping[str, str] | None
+    ) -> None:
+        await asyncio.to_thread(
+            self._runtime.down, compose_path, project_name, remove_volumes=True
+        )
+        await asyncio.to_thread(self._runtime.up, compose_path, project_name, env=env)
 
     async def _status(
         self, compose_path: Path, project_name: str, health_url: str | None
     ) -> ComponentState:
-        if not self._runtime.is_running(compose_path, project_name):
+        is_running = await asyncio.to_thread(self._runtime.is_running, compose_path, project_name)
+        if not is_running:
             return ComponentState.STOPPED
         if health_url is None:
             return ComponentState.HEALTHY
@@ -76,7 +90,7 @@ class LifecycleService:
 
     # -- backends ----------------------------------------------------------
 
-    def start_backend(self, spec: BackendSpec, env: Mapping[str, str] | None = None) -> None:
+    async def start_backend(self, spec: BackendSpec, env: Mapping[str, str] | None = None) -> None:
         """Start a backend's stack, unless it runs in-process.
 
         Args:
@@ -86,9 +100,9 @@ class LifecycleService:
         """
         if not spec.needs_container:
             return
-        self._start(self._backend_compose_path(spec), spec.id, env)
+        await self._start(self._backend_compose_path(spec), spec.id, env)
 
-    def stop_backend(self, spec: BackendSpec) -> None:
+    async def stop_backend(self, spec: BackendSpec) -> None:
         """Stop a backend's stack, unless it runs in-process.
 
         Args:
@@ -96,9 +110,9 @@ class LifecycleService:
         """
         if not spec.needs_container:
             return
-        self._stop(self._backend_compose_path(spec), spec.id)
+        await self._stop(self._backend_compose_path(spec), spec.id)
 
-    def reset_backend(self, spec: BackendSpec, env: Mapping[str, str] | None = None) -> None:
+    async def reset_backend(self, spec: BackendSpec, env: Mapping[str, str] | None = None) -> None:
         """Wipe a backend's persisted state and bring it back up clean.
 
         Args:
@@ -107,7 +121,7 @@ class LifecycleService:
         """
         if not spec.needs_container:
             return
-        self._reset(self._backend_compose_path(spec), spec.id, env)
+        await self._reset(self._backend_compose_path(spec), spec.id, env)
 
     async def get_backend_status(self, spec: BackendSpec) -> ComponentState:
         """Report a backend's current lifecycle state.
@@ -131,29 +145,29 @@ class LifecycleService:
     # lifecycle, independent of any one backend, so there's a single set
     # of methods rather than a near-identical copy per kind.
 
-    def start_standalone_service(self, spec: StandaloneServiceSpec) -> None:
+    async def start_standalone_service(self, spec: StandaloneServiceSpec) -> None:
         """Start a standalone service's stack.
 
         Args:
             spec: The service to start.
         """
-        self._start(self._standalone_service_compose_path(spec), spec.id, None)
+        await self._start(self._standalone_service_compose_path(spec), spec.id, None)
 
-    def stop_standalone_service(self, spec: StandaloneServiceSpec) -> None:
+    async def stop_standalone_service(self, spec: StandaloneServiceSpec) -> None:
         """Stop a standalone service's stack.
 
         Args:
             spec: The service to stop.
         """
-        self._stop(self._standalone_service_compose_path(spec), spec.id)
+        await self._stop(self._standalone_service_compose_path(spec), spec.id)
 
-    def reset_standalone_service(self, spec: StandaloneServiceSpec) -> None:
+    async def reset_standalone_service(self, spec: StandaloneServiceSpec) -> None:
         """Wipe a standalone service's data and bring it back up clean.
 
         Args:
             spec: The service to reset.
         """
-        self._reset(self._standalone_service_compose_path(spec), spec.id, None)
+        await self._reset(self._standalone_service_compose_path(spec), spec.id, None)
 
     async def get_standalone_service_status(self, spec: StandaloneServiceSpec) -> ComponentState:
         """Report a standalone service's current lifecycle state.

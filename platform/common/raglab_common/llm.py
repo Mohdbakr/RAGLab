@@ -33,14 +33,17 @@ class LLMResponse(BaseModel):
     """A completion, normalized across providers.
 
     Attributes:
-        content: The model's reply text.
+        content: The model's reply text. None when the model's turn was a
+            tool/function call instead of text (see the ``tools`` kwarg on
+            :meth:`LLMClient.complete`) — callers using tools must handle
+            this case rather than assuming text is always present.
         model: The provider/model string that produced this response.
         prompt_tokens: Prompt tokens consumed, if the provider reported it.
         completion_tokens: Completion tokens produced, if the provider
             reported it.
     """
 
-    content: str
+    content: str | None
     model: str
     prompt_tokens: int | None = None
     completion_tokens: int | None = None

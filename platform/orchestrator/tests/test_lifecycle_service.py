@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import threading
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -20,26 +21,32 @@ class FakeRuntime:
     """Records calls instead of touching Docker; `running` scripts is_running.
 
     Each recorded call includes the project_name LifecycleService passed,
-    so tests can assert it's always the catalog spec's own id.
+    so tests can assert it's always the catalog spec's own id, and the
+    thread it ran on, so tests can assert blocking calls are offloaded
+    off the event loop rather than run inline.
     """
 
     running: bool = False
     up_calls: list[tuple[Path, str, Mapping[str, str] | None]] = field(default_factory=list)
     down_calls: list[tuple[Path, str, bool]] = field(default_factory=list)
+    call_threads: list[threading.Thread] = field(default_factory=list)
 
     def up(
         self, compose_file: Path, project_name: str, env: Mapping[str, str] | None = None
     ) -> None:
+        self.call_threads.append(threading.current_thread())
         self.up_calls.append((compose_file, project_name, env))
         self.running = True
 
     def down(
         self, compose_file: Path, project_name: str, *, remove_volumes: bool = False
     ) -> None:
+        self.call_threads.append(threading.current_thread())
         self.down_calls.append((compose_file, project_name, remove_volumes))
         self.running = False
 
     def is_running(self, compose_file: Path, project_name: str) -> bool:
+        self.call_threads.append(threading.current_thread())
         return self.running
 
 
@@ -112,40 +119,44 @@ def embedding_service(**overrides: object) -> StandaloneServiceSpec:
 
 
 class TestBackendLifecycle:
-    def test_start_resolves_path_and_forwards_env(self) -> None:
+    @pytest.mark.asyncio
+    async def test_start_resolves_path_and_forwards_env(self) -> None:
         runtime = FakeRuntime()
         service = LifecycleService(runtime, FakeHealthChecker(), repo_root=REPO_ROOT)
 
-        service.start_backend(containerized_backend(), env={"VECTOR_STORE_HOST": "chroma"})
+        await service.start_backend(containerized_backend(), env={"VECTOR_STORE_HOST": "chroma"})
 
         (call,) = runtime.up_calls
         assert call[0] == REPO_ROOT / "projects/03-production-rag-reference" / "docker-compose.yml"
         assert call[1] == "03-production-rag-reference"
         assert call[2] == {"VECTOR_STORE_HOST": "chroma"}
 
-    def test_start_is_a_no_op_for_an_in_process_backend(self) -> None:
+    @pytest.mark.asyncio
+    async def test_start_is_a_no_op_for_an_in_process_backend(self) -> None:
         runtime = FakeRuntime()
         service = LifecycleService(runtime, FakeHealthChecker(), repo_root=REPO_ROOT)
 
-        service.start_backend(in_process_backend())
+        await service.start_backend(in_process_backend())
 
         assert runtime.up_calls == []
 
-    def test_stop_uses_the_backends_own_id_as_project_name(self) -> None:
+    @pytest.mark.asyncio
+    async def test_stop_uses_the_backends_own_id_as_project_name(self) -> None:
         runtime = FakeRuntime(running=True)
         service = LifecycleService(runtime, FakeHealthChecker(), repo_root=REPO_ROOT)
 
-        service.stop_backend(containerized_backend())
+        await service.stop_backend(containerized_backend())
 
         (call,) = runtime.down_calls
         assert call[1] == "03-production-rag-reference"
         assert call[2] is False
 
-    def test_reset_tears_down_with_volumes_then_brings_back_up(self) -> None:
+    @pytest.mark.asyncio
+    async def test_reset_tears_down_with_volumes_then_brings_back_up(self) -> None:
         runtime = FakeRuntime(running=True)
         service = LifecycleService(runtime, FakeHealthChecker(), repo_root=REPO_ROOT)
 
-        service.reset_backend(containerized_backend(), env={"X": "1"})
+        await service.reset_backend(containerized_backend(), env={"X": "1"})
 
         assert runtime.down_calls == [
             (
@@ -201,21 +212,23 @@ class TestBackendLifecycle:
 
 
 class TestVectorStoreLifecycle:
-    def test_start_resolves_compose_path_and_uses_its_own_id_as_project_name(self) -> None:
+    @pytest.mark.asyncio
+    async def test_start_resolves_compose_path_and_uses_its_own_id_as_project_name(self) -> None:
         runtime = FakeRuntime()
         service = LifecycleService(runtime, FakeHealthChecker(), repo_root=REPO_ROOT)
 
-        service.start_standalone_service(chroma_store())
+        await service.start_standalone_service(chroma_store())
 
         (call,) = runtime.up_calls
         assert call[0] == REPO_ROOT / "platform/vectorstores/chroma/docker-compose.yml"
         assert call[1] == "chroma"
 
-    def test_reset_tears_down_with_volumes_then_brings_back_up(self) -> None:
+    @pytest.mark.asyncio
+    async def test_reset_tears_down_with_volumes_then_brings_back_up(self) -> None:
         runtime = FakeRuntime(running=True)
         service = LifecycleService(runtime, FakeHealthChecker(), repo_root=REPO_ROOT)
 
-        service.reset_standalone_service(chroma_store())
+        await service.reset_standalone_service(chroma_store())
 
         assert runtime.down_calls[0][1] == "chroma"
         assert runtime.down_calls[0][2] is True
@@ -256,21 +269,23 @@ class TestVectorStoreLifecycle:
 
 
 class TestEmbeddingServiceLifecycle:
-    def test_start_resolves_compose_path_and_uses_its_own_id_as_project_name(self) -> None:
+    @pytest.mark.asyncio
+    async def test_start_resolves_compose_path_and_uses_its_own_id_as_project_name(self) -> None:
         runtime = FakeRuntime()
         service = LifecycleService(runtime, FakeHealthChecker(), repo_root=REPO_ROOT)
 
-        service.start_standalone_service(embedding_service())
+        await service.start_standalone_service(embedding_service())
 
         (call,) = runtime.up_calls
         assert call[0] == REPO_ROOT / "projects/00-embedding-service/docker-compose.yml"
         assert call[1] == "00-embedding-service"
 
-    def test_reset_tears_down_with_volumes_then_brings_back_up(self) -> None:
+    @pytest.mark.asyncio
+    async def test_reset_tears_down_with_volumes_then_brings_back_up(self) -> None:
         runtime = FakeRuntime(running=True)
         service = LifecycleService(runtime, FakeHealthChecker(), repo_root=REPO_ROOT)
 
-        service.reset_standalone_service(embedding_service())
+        await service.reset_standalone_service(embedding_service())
 
         assert runtime.down_calls[0][1] == "00-embedding-service"
         assert runtime.down_calls[0][2] is True
@@ -296,3 +311,42 @@ class TestEmbeddingServiceLifecycle:
             await service.get_standalone_service_status(embedding_service())
             is ComponentState.STOPPED
         )
+
+
+class TestDoesNotBlockTheEventLoop:
+    """Guards against docker-compose subprocess calls stalling the orchestrator.
+
+    Each runtime call must happen off the calling (main/event-loop) thread,
+    so one slow `docker compose` invocation can't starve every other
+    concurrent request the orchestrator is serving.
+    """
+
+    @pytest.mark.asyncio
+    async def test_start_runs_off_the_calling_thread(self) -> None:
+        runtime = FakeRuntime()
+        service = LifecycleService(runtime, FakeHealthChecker(), repo_root=REPO_ROOT)
+
+        await service.start_backend(containerized_backend())
+
+        (thread,) = runtime.call_threads
+        assert thread is not threading.current_thread()
+
+    @pytest.mark.asyncio
+    async def test_stop_runs_off_the_calling_thread(self) -> None:
+        runtime = FakeRuntime(running=True)
+        service = LifecycleService(runtime, FakeHealthChecker(), repo_root=REPO_ROOT)
+
+        await service.stop_backend(containerized_backend())
+
+        (thread,) = runtime.call_threads
+        assert thread is not threading.current_thread()
+
+    @pytest.mark.asyncio
+    async def test_status_check_runs_off_the_calling_thread(self) -> None:
+        runtime = FakeRuntime(running=True)
+        service = LifecycleService(runtime, FakeHealthChecker(), repo_root=REPO_ROOT)
+
+        await service.get_backend_status(containerized_backend())
+
+        (thread,) = runtime.call_threads
+        assert thread is not threading.current_thread()

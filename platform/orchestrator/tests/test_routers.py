@@ -87,27 +87,27 @@ class FakeLifecycleService:
     reset_standalone_service_calls: list[StandaloneServiceSpec] = field(default_factory=list)
     raise_on_start_backend: Exception | None = None
 
-    def start_backend(self, spec: BackendSpec, env: dict[str, str] | None = None) -> None:
+    async def start_backend(self, spec: BackendSpec, env: dict[str, str] | None = None) -> None:
         if self.raise_on_start_backend is not None:
             raise self.raise_on_start_backend
         self.start_backend_calls.append((spec, env))
 
-    def stop_backend(self, spec: BackendSpec) -> None:
+    async def stop_backend(self, spec: BackendSpec) -> None:
         self.stop_backend_calls.append(spec)
 
-    def reset_backend(self, spec: BackendSpec, env: dict[str, str] | None = None) -> None:
+    async def reset_backend(self, spec: BackendSpec, env: dict[str, str] | None = None) -> None:
         self.reset_backend_calls.append((spec, env))
 
     async def get_backend_status(self, spec: BackendSpec) -> ComponentState:
         return self.state
 
-    def start_standalone_service(self, spec: StandaloneServiceSpec) -> None:
+    async def start_standalone_service(self, spec: StandaloneServiceSpec) -> None:
         self.start_standalone_service_calls.append(spec)
 
-    def stop_standalone_service(self, spec: StandaloneServiceSpec) -> None:
+    async def stop_standalone_service(self, spec: StandaloneServiceSpec) -> None:
         self.stop_standalone_service_calls.append(spec)
 
-    def reset_standalone_service(self, spec: StandaloneServiceSpec) -> None:
+    async def reset_standalone_service(self, spec: StandaloneServiceSpec) -> None:
         self.reset_standalone_service_calls.append(spec)
 
     async def get_standalone_service_status(self, spec: StandaloneServiceSpec) -> ComponentState:

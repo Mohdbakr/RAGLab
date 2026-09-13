@@ -161,19 +161,29 @@ def render_main(
     with try_it_tab:
         if backend_id is None:
             st.info("Pick a backend from the sidebar to get started.")
-        elif client.get_backend_status(backend_id).state != "healthy":
-            st.info("Launch the backend from the sidebar, then come back here once it's ready.")
         else:
-            st.caption(
-                "Chat and file upload wired to the live backend land with each "
-                "project's own weekend milestone."
-            )
-            prompt = st.chat_input("Ask something...")
-            if prompt:
-                st.chat_message("user").write(prompt)
-                st.chat_message("assistant").write(
-                    "(this project hasn't wired up chat yet — check back after its weekend lands)"
-                )
+            try:
+                backend_state = client.get_backend_status(backend_id).state
+            except Exception as exc:  # noqa: BLE001 - surfaced to the user, not swallowed
+                st.error(f"Can't check {backend_id}'s status: {describe_error(exc)}")
+                log.warning("status check failed for {}: {}", backend_id, exc)
+            else:
+                if backend_state != "healthy":
+                    st.info(
+                        "Launch the backend from the sidebar, then come back here once it's ready."
+                    )
+                else:
+                    st.caption(
+                        "Chat and file upload wired to the live backend land with each "
+                        "project's own weekend milestone."
+                    )
+                    prompt = st.chat_input("Ask something...")
+                    if prompt:
+                        st.chat_message("user").write(prompt)
+                        st.chat_message("assistant").write(
+                            "(this project hasn't wired up chat yet — check back after its "
+                            "weekend lands)"
+                        )
 
     with benchmarks_tab:
         st.caption(
