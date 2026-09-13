@@ -103,6 +103,12 @@ class TestIngestCommand:
         result = runner.invoke(cli.app, ["ingest", str(tmp_path / "does-not-exist.txt")])
 
         assert result.exit_code == 1
+        # On this Click/Typer version, a clean `typer.Exit(code=1)` bubbles up as a
+        # real SystemExit (Click's own sys.exit(e.exit_code)), while an *uncaught*
+        # exception (the old bug) reaches Click's runner as the raw exception itself
+        # (e.g. FileNotFoundError) -- `result.exception is None` never holds for a
+        # nonzero exit code in this Click version, so we assert on the type instead.
+        assert isinstance(result.exception, SystemExit)
 
 
 class TestAskCommand:
