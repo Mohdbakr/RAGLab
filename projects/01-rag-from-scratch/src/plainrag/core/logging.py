@@ -52,7 +52,7 @@ def print_banner(version: str) -> None:
     Args:
         version: The application version to display.
     """
-    console = Console()
+    console = Console(stderr=True)
     console.print(
         Panel.fit(
             f"[bold cyan]plainrag[/] [dim]v{version}[/]\n"

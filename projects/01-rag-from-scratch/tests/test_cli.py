@@ -97,6 +97,13 @@ class TestIngestCommand:
 
         assert result.exit_code == 1
 
+    def test_exits_with_an_error_when_the_input_file_is_missing(self, tmp_path: Path) -> None:
+        from plainrag import cli
+
+        result = runner.invoke(cli.app, ["ingest", str(tmp_path / "does-not-exist.txt")])
+
+        assert result.exit_code == 1
+
 
 class TestAskCommand:
     def test_exits_with_an_error_when_the_index_is_empty(self, tmp_path: Path) -> None:

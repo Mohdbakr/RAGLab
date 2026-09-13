@@ -1,6 +1,6 @@
-"""Tests for plainrag.rag, written before the implementation.
+"""Tests for plainrag.services.rag, written before the implementation.
 
-embed_texts and answer_question are monkeypatched at the plainrag.rag
+embed_texts and answer_question are monkeypatched at the plainrag.services.rag
 module namespace (where rag.py imports them), so no litellm call happens.
 """
 

@@ -29,5 +29,5 @@ class TestPrintBanner:
         print_banner("0.1.0")
 
         captured = capsys.readouterr()
-        assert "plainrag" in captured.out
-        assert "0.1.0" in captured.out
+        assert "plainrag" in captured.err
+        assert "0.1.0" in captured.err

@@ -54,7 +54,7 @@ def ingest(
             )
         )
         index.save(index_path)
-    except PlainRAGError as e:
+    except (PlainRAGError, OSError) as e:
         log.error(str(e))
         raise typer.Exit(code=1) from e
     typer.echo(f"Added {added} chunk(s) from {path} to {index_path}")

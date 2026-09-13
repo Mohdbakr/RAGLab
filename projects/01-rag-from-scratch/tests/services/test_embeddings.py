@@ -1,4 +1,4 @@
-"""Tests for plainrag.embeddings, written before the implementation.
+"""Tests for plainrag.services.embeddings, written before the implementation.
 
 litellm itself is never called — `litellm.aembedding` is monkeypatched.
 """

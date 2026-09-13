@@ -1,4 +1,4 @@
-"""Tests for plainrag.llm, written before the implementation."""
+"""Tests for plainrag.services.llm, written before the implementation."""
 
 from __future__ import annotations
 

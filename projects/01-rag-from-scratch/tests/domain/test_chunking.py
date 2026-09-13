@@ -1,4 +1,4 @@
-"""Tests for plainrag.chunking, written before the implementation."""
+"""Tests for plainrag.domain.chunking, written before the implementation."""
 
 from __future__ import annotations
 
