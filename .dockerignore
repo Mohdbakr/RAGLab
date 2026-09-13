@@ -1,8 +1,16 @@
 .env
 venv/
+.venv/
 Dockerfile
 .DS_Store
+.git/
+**/__pycache__/
+**/*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
 # Exclude data or temporary storage
 data/
 volumes/
 logs/
+benchmarks/

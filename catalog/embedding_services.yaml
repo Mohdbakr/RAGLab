@@ -1,0 +1,21 @@
+# Registry of embedding microservices the unified launcher can start
+# independently of any one backend, for backends that declare them in
+# `compatible_embedding_services`.
+#
+# Schema (per entry):
+#   id            Unique slug.
+#   name          Human-readable display name.
+#   compose_path  Path (from repo root) to a docker-compose file that stands up just this service.
+#   host          Hostname the service is reachable at once its compose stack is up.
+#   port          Primary client port.
+#   health_path   HTTP path (or "" for a TCP-only check) polled to decide "starting" vs "healthy".
+#   status        "planned" | "in_progress" | "shipped".
+
+embedding_services:
+  - id: "00-embedding-service"
+    name: "Embedding Service"
+    compose_path: "projects/00-embedding-service/docker-compose.yml"
+    host: "localhost"
+    port: 9100
+    health_path: "/healthz"
+    status: "shipped"

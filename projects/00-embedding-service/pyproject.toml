@@ -1,0 +1,43 @@
+[project]
+name = "embedding-service"
+version = "0.1.0"
+description = "Standalone, model-swappable embedding microservice — a production-style pattern other RAGLab projects can optionally call over HTTP instead of embedding in-process."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi[standard]>=0.115.6",
+    "pydantic-settings>=2.7.0",
+    "raglab-common[local-embeddings]",
+]
+
+[tool.uv.sources]
+raglab-common = { path = "../../platform/common", editable = true }
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "pytest-cov>=6.0",
+    "ruff>=0.8",
+    "mypy>=1.13",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+ignore = ["B008"]  # FastAPI's Depends()-as-default-argument pattern
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+
+[[tool.mypy.overrides]]
+module = "sentence_transformers.*"
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+addopts = "--cov=app --cov-report=term-missing"
+asyncio_mode = "auto"

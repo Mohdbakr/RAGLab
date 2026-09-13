@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    name: check (${{ matrix.component }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        component:
+          - platform/common
+          - platform/orchestrator
+          - platform/frontend
+          - projects/00-embedding-service
+          # further projects/* join this matrix as each weekend milestone ships
+          # a pyproject.toml with lint/type/test config. 02-document-qa-foundation
+          # is intentionally excluded until its owner finishes reviewing it.
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        working-directory: ${{ matrix.component }}
+        run: uv sync
+
+      - name: Lint (ruff)
+        working-directory: ${{ matrix.component }}
+        run: uv run ruff check .
+
+      - name: Type-check (mypy)
+        working-directory: ${{ matrix.component }}
+        run: uv run mypy .
+
+      - name: Test (pytest)
+        working-directory: ${{ matrix.component }}
+        run: uv run pytest

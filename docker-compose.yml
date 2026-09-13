@@ -1,0 +1,54 @@
+# Standard way to run RAGLab: `docker compose up --build` from the repo
+# root. Starts the orchestrator (which controls every other project's
+# containers) and the unified frontend.
+#
+# IMPORTANT: run this from the repo root — both services rely on ${PWD}
+# resolving to the repo root to mirror it correctly inside the orchestrator
+# container (see the comment on that service below).
+#
+# Platform note: `network_mode: host` is used so the orchestrator and
+# frontend can reach sibling project containers (and each other) at their
+# published localhost ports, with zero extra network wiring. This works
+# natively on Linux. On Docker Desktop for Mac/Windows, either turn on
+# "host networking" in Docker Desktop's settings (Settings > Resources >
+# Network, on recent versions), or skip Docker for these two services and
+# run them directly instead — see the "Alternative: run without Docker"
+# section in the README; neither the orchestrator nor the frontend
+# strictly needs to be containerized, only the Docker socket needs to be
+# reachable from the orchestrator.
+
+name: raglab
+
+services:
+  orchestrator:
+    build:
+      context: .
+      dockerfile: platform/orchestrator/Dockerfile
+    container_name: raglab_orchestrator
+    network_mode: host
+    environment:
+      # Without this, the orchestrator can't tell where the real repo is
+      # on the host — it needs that to hand `docker compose` real,
+      # host-valid paths to each project's compose file.
+      RAGLAB_REPO_ROOT: ${PWD}
+    volumes:
+      # Lets this container drive the HOST's Docker daemon (Docker
+      # outside of Docker) instead of running a nested daemon of its own.
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Mirrors the repo into the container at the SAME absolute path it
+      # has on the host. This is what makes the trick above work: when
+      # `docker compose` (running in this container) resolves a project's
+      # relative volume/build paths, the absolute paths it computes are
+      # real, valid paths on the host too, because it's the same path.
+      - ${PWD}:${PWD}
+
+  frontend:
+    build:
+      context: .
+      dockerfile: platform/frontend/Dockerfile
+    container_name: raglab_frontend
+    network_mode: host
+    environment:
+      ORCHESTRATOR_BASE_URL: http://localhost:8100
+    depends_on:
+      - orchestrator
