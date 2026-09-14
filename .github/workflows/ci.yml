@@ -11,6 +11,7 @@ on:
   pull_request:
     paths:
       - "projects/**"
+  workflow_dispatch: {}
 
 jobs:
   discover:
