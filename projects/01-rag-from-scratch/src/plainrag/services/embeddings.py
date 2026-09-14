@@ -37,4 +37,4 @@ async def embed_texts(
         raise EmbeddingError(
             f"Failed to embed {len(texts)} text(s) with model {model!r}: {e}"
         ) from e
-    return [item.embedding for item in response.data]
+    return [item["embedding"] for item in response.data]
