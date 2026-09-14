@@ -181,3 +181,4 @@ volumes/
 
 # Claude Code superpowers scratch workspace (ephemeral, per-plan)
 .superpowers/
+**/docs/superpowers/
