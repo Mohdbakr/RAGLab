@@ -90,6 +90,11 @@ ingest:
 ask:
 	uv run plainrag ask "$(QUESTION)"
 
+## Interactively ingest files and search the index (retrieval only, no LLM)
+.PHONY: demo
+demo:
+	uv run plainrag demo
+
 #################################################################################
 # DOCKER
 #################################################################################

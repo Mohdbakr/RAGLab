@@ -20,6 +20,10 @@ It's fully standalone: no dependency on anything else in this repo.
    similar chunks by cosine similarity, assemble them into a prompt with
    citations, and ask an LLM (`src/plainrag/services/llm.py`, also via
    `litellm`) to answer strictly from that context.
+3. **`demo`** — an interactive loop over `ingest <path>` and
+   `search <query>`, retrieval only (no LLM call), so you can watch
+   chunking → embedding → retrieval happen step by step against whatever
+   you feed it, without a generation step in the way.
 
 ## Architecture
 
@@ -44,7 +48,8 @@ graph TD
 - **`services/`** — anything touching the network or disk, plus the
   orchestration that ties it together: `embeddings.py` and `llm.py`
   (direct `litellm` calls), `index.py` (the on-disk cosine-similarity
-  index), and `rag.py` (`ingest_text()` / `ask()`).
+  index), and `rag.py` (`ingest_text()` / `retrieve()` / `ask()` — `ask()`
+  calls `retrieve()` then layers an LLM call on top).
 - **`core/`** — cross-cutting concerns with no dependencies on the rest
   of the package: `config.py` (settings), `exceptions.py` (the error
   hierarchy), `logging.py` (console/file logging plus the startup
@@ -54,7 +59,8 @@ graph TD
   `services.rag`, and is the only place that catches `PlainRAGError`
   and turns it into a clean exit code instead of a traceback.
 
-Call graph for both commands:
+Call graph for all three commands (`ask` and `demo search` both go through
+`services.rag.retrieve`; `ask` layers an LLM call on top):
 
 ```mermaid
 flowchart LR
@@ -64,9 +70,14 @@ flowchart LR
     RAG_I --> IDX_A["services.index .add / .save"]
 
     CLI_A["cli.ask"] --> RAG_A["services.rag.ask"]
-    RAG_A --> EMB2["services.embeddings.embed_texts"]
-    RAG_A --> IDX_S["services.index .search"]
+    RAG_A --> RAG_R["services.rag.retrieve"]
     RAG_A --> LLM["services.llm.answer_question"]
+
+    CLI_D["cli.demo"] --> RAG_I
+    CLI_D --> RAG_R
+
+    RAG_R --> EMB2["services.embeddings.embed_texts"]
+    RAG_R --> IDX_S["services.index .search"]
 ```
 
 This is a hardening pass, not a rewrite: the chunking algorithm,
@@ -83,6 +94,7 @@ cp .env.example .env   # fill in OPENAI_API_KEY, or point at any litellm-support
 
 uv run plainrag ingest path/to/some.txt
 uv run plainrag ask "What does the document say about X?"
+uv run plainrag demo   # interactive: ingest <path> | search <query> | quit
 ```
 
 Or with `make` (see `make help` for the full list):
@@ -91,6 +103,7 @@ Or with `make` (see `make help` for the full list):
 make install
 make ingest FILE=path/to/some.txt
 make ask QUESTION="What does the document say about X?"
+make demo
 ```
 
 No separate service — the index is just a file on disk
