@@ -1,0 +1,58 @@
+name: CI
+
+# Runs `make check` (lint + typecheck + test) for every project under
+# `projects/` that has a Makefile. Adding a new project needs no edits
+# here: the discover job finds it by directory, not by name.
+
+on:
+  push:
+    paths:
+      - "projects/**"
+  pull_request:
+    paths:
+      - "projects/**"
+  workflow_dispatch: {}
+
+jobs:
+  discover:
+    name: Discover projects
+    runs-on: ubuntu-latest
+    outputs:
+      projects: ${{ steps.find.outputs.projects }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: find
+        name: Find projects with a Makefile
+        run: |
+          projects=$(find projects -mindepth 1 -maxdepth 1 -type d \
+            -exec test -e "{}/Makefile" \; -print | sort | jq -R -s -c \
+            'split("\n") | map(select(length > 0))')
+          echo "Discovered: $projects"
+          echo "projects=$projects" >> "$GITHUB_OUTPUT"
+
+  check:
+    name: make check (${{ matrix.project }})
+    needs: discover
+    if: needs.discover.outputs.projects != '[]'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        project: ${{ fromJson(needs.discover.outputs.projects) }}
+    defaults:
+      run:
+        working-directory: ${{ matrix.project }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v10.1.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: "${{ matrix.project }}/uv.lock"
+
+      # uv reads .python-version in this directory and installs it if needed
+      # (each project pins its own; no need to hardcode a version here).
+      - run: uv sync
+
+      - run: make check
