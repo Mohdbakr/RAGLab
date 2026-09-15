@@ -1,118 +1,36 @@
 # RAGLab
-# RAG Application
 
-This is a production-ready RAG application built using FastAPI, Streamlit, Milvus, and OpenAI.
+A benchmarking monorepo for comparing retrieval-augmented generation (RAG)
+implementations. Each project under `projects/` is a fully standalone,
+self-contained approach — no shared package, no shared assumptions between
+them — so they stay directly comparable and independently runnable.
 
-## Architecture
+## Projects
 
-- **Frontend:** Streamlit for the UI with chatbot interface and file upload.
-- **Backend:** FastAPI for the API with async endpoints.
-- **Vector Database:** Milvus for storing embeddings.
-- **Embedding Model:** Sentence-transformers/all-mpnet-base-v2 for generating embeddings.
-- **LLM:** OpenAI GPT for generating responses.
-- **Monitoring:** Attu for visualizing Milvus.
+- **[`projects/01-rag-from-scratch`](projects/01-rag-from-scratch/README.md)**
+  — RAG with no framework and no vector-database service: chunking,
+  embeddings, cosine similarity, and prompt assembly written out plainly,
+  nothing hidden behind an abstraction. A CLI (`ingest` / `ask` / `demo`)
+  ingests a text file and answers questions grounded in it.
 
-## Project Structure
+More projects will land alongside it over time, each exploring a different
+set of tradeoffs (e.g. a framework-backed implementation, an ANN-backed
+vector store) for comparison against the others.
+
+## Structure
 
 ```
-rag-lab/
-├── backend/
-│   ├── app/
-│   │   ├── __init__.py
-│   │   ├── main.py
-│   │   ├── api/
-│   │   │   ├── __init__.py
-│   │   │   ├── routes.py
-│   │   │   └── dependencies.py
-│   │   ├── core/
-│   │   │   ├── __init__.py
-│   │   │   ├── config.py
-│   │   │   └── logging.py
-│   │   ├── services/
-│   │   │   ├── __init__.py
-│   │   │   ├── embedding.py
-│   │   │   └── background.py
-│   │   └── repository/
-│   │       ├── __init__.py
-│   │       └── milvus.py
-│   ├── tests/
-│   │   ├── __init__.py
-│   │   ├── test_api.py
-│   │   └── test_services.py
-│   └── Dockerfile
-├── frontend/
-│   ├── src/
-│   │   ├── __init__.py
-│   │   ├── main.py
-│   │   ├── components/
-│   │   │   ├── __init__.py
-│   │   │   ├── chat.py
-│   │   │   └── sidebar.py
-│   │   └── utils/
-│   │       ├── __init__.py
-│   │       └── api.py
-│   └── Dockerfile
-├── config/
-│   ├── logging.yaml
-│   └── milvus.yaml
-├── docker/
-│   └── docker-compose.yml
-├── docs/
-│   ├── setup.md
-│   └── api.md
-├── logs/
-└── README.md
+RAGLab/
+└── projects/
+    └── 01-rag-from-scratch/   # no framework, no vector-DB service
 ```
 
-## Setup and Deployment
+## Getting started
 
-1.  **Clone the repository:**
-    ```bash
-    git clone <repository-url>
-    cd rag-app
-    ```
+Every project is standalone — its own dependencies, its own `.env`, its own
+README. Pick one and follow its instructions:
 
-2.  **Install `uv` globally:**
-    ```bash
-     pip install uv
-    ```
-
-3.  **Create a virtual environment:**
-    ```bash
-    uv venv .venv
-    source .venv/bin/activate
-    ```
-
-    ```PowerShell
-    .venv/bin/activate
-    ```
-
-4. **Install the application requirements:**
-    ```bash
-    uv pip install -r pyproject.toml
-    ```
-5.  **Set up environment variables:**
-    - Create a `.env` file based on the `.env.example` and add your API keys.
-
-6.  **Run Docker Compose:**
-    ```bash
-    docker-compose up --build
-    ```
-
-7.  **Access the applications:**
-    -   Frontend: http://localhost:8501
-    -   Attu: http://localhost:3000
-    -   Backend: http://localhost:8000/docs (for API Documentation access)
-
-## Features
-* Document upload
-* Chat interface
-* Vector search 
-* Real-time chat with Websockets
-* Healthcheck endpoint
-* API Key security
-* Docker based configuration
-* Error handling
-
-## API Documentation
-You can access the OpenAPI documentation at http://localhost:8000/docs
+```bash
+cd projects/01-rag-from-scratch
+cat README.md
+```
