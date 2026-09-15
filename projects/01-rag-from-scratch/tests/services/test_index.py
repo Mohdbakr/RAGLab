@@ -78,6 +78,33 @@ class TestSearch:
 
         assert len(results) == 2
 
+    def test_zero_k_raises_value_error(self) -> None:
+        index = CosineSimilarityIndex()
+        index.add([chunk("a", [1.0, 0.0])])
+
+        with pytest.raises(ValueError, match="k must be positive"):
+            index.search([1.0, 0.0], k=0)
+
+    def test_negative_k_raises_value_error(self) -> None:
+        index = CosineSimilarityIndex()
+        index.add([chunk("a", [1.0, 0.0])])
+
+        with pytest.raises(ValueError, match="k must be positive"):
+            index.search([1.0, 0.0], k=-1)
+
+    def test_invalid_k_raises_even_on_an_empty_index(self) -> None:
+        index = CosineSimilarityIndex()
+
+        with pytest.raises(ValueError, match="k must be positive"):
+            index.search([1.0, 0.0], k=0)
+
+    def test_dimension_mismatch_raises_value_error(self) -> None:
+        index = CosineSimilarityIndex()
+        index.add([chunk("a", [1.0, 0.0, 0.0])])
+
+        with pytest.raises(ValueError, match="dimension mismatch"):
+            index.search([1.0, 0.0], k=1)
+
 
 class TestSaveAndLoad:
     def test_round_trips_through_disk(self, tmp_path: Path) -> None:

@@ -27,6 +27,10 @@ class CosineSimilarityIndex:
     def __len__(self) -> int:
         return len(self._chunks)
 
+    def __repr__(self) -> str:
+        dim = len(self._chunks[0].embedding) if self._chunks else None
+        return f"CosineSimilarityIndex(chunks={len(self._chunks)}, dim={dim})"
+
     def add(self, chunks: list[DocumentChunk]) -> None:
         """Add chunks to the index.
 
@@ -45,9 +49,22 @@ class CosineSimilarityIndex:
         Returns:
             Up to ``k`` chunks, most similar first. Empty if the index has
             no chunks.
+
+        Raises:
+            ValueError: If ``k`` isn't positive, or ``query_embedding``'s
+                dimension doesn't match the chunks already in the index.
         """
+        if k <= 0:
+            raise ValueError(f"k must be positive, got {k}")
         if not self._chunks:
             return []
+
+        expected_dim = len(self._chunks[0].embedding)
+        if len(query_embedding) != expected_dim:
+            raise ValueError(
+                f"Query embedding dimension mismatch: expected {expected_dim}, "
+                f"got {len(query_embedding)}"
+            )
 
         matrix = np.array([c.embedding for c in self._chunks], dtype=np.float64)
         query = np.array(query_embedding, dtype=np.float64)
